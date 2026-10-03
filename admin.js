@@ -102,7 +102,13 @@ function renderTemplateSelect(){
 function renderTemplateList(){$('templateList').innerHTML=templates.map(t=>'<div class="admin-item">'+(t.image_url?'<img src="'+esc(t.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(t.name)+'</b><br><span class="hint">'+(t.active?'使用中':'已停用')+'</span></div><div class="actions"><button class="small-btn" onclick="openTemplateDialog('+t.id+')">編輯</button></div></div>').join('')||'<div class="loading">尚無菜單</div>'}
 function renderSessionList(){$('sessionList').innerHTML=sessions.map(s=>'<div class="admin-item">'+(s.menu_templates?.image_url?'<img src="'+esc(s.menu_templates.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(s.menu_templates?.name||'菜單')+'</b><br>'+esc(s.meal_date)+(s.cutoff_at?' · 截止 '+esc(new Date(s.cutoff_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):'')+'<br><span class="hint">'+(s.is_active?'開放':'關閉')+'</span></div><div class="actions"><button class="small-btn" onclick="openSessionDialog('+s.id+')">編輯</button></div></div>').join('')||'<div class="loading">尚無日期</div>'}
 function renderStudentList(){$('studentList').innerHTML=students.map(s=>'<div class="student-row"><span class="seat-badge">'+s.seat_number+'號</span><div><b>'+esc(s.name||'尚未設定姓名')+'</b><br><span class="hint">'+(s.auth_user_id?'帳號已建立':'尚未初始化')+' · '+(s.active?'啟用中':'已停用')+(s.must_setup?' · 待首次設定':'')+'</span></div><div class="actions"><button class="small-btn" onclick="openStudentDialog(\''+s.id+'\')">編輯</button></div></div>').join('')||'<div class="loading">尚無學生</div>'}
-function renderInitStatus(){if(!$('initStatus'))return;const linked=students.filter(s=>s.auth_user_id).length;$('initStatus').textContent='Auth 帳號 '+linked+' / '+students.length+' 已建立';$('initStudentsBtn').disabled=students.length>0&&linked===students.length;$('initStudentsBtn').textContent=linked===students.length?'學生帳號已完成':'初始化學生帳號'}
+function renderInitStatus(){
+  if(!$('initStatus'))return;
+  const managed=students.filter(s=>s.seat_number!==0),linked=managed.filter(s=>s.auth_user_id).length;
+  $('initStatus').textContent='學生 Auth 帳號 '+linked+' / '+managed.length+' 已建立；老師帳號首次用 tch 登入時建立';
+  $('initStudentsBtn').disabled=managed.length>0&&linked===managed.length;
+  $('initStudentsBtn').textContent=linked===managed.length?'學生帳號已完成':'初始化學生帳號';
+}
 
 $('initStudentsBtn').addEventListener('click',async()=>{
   if(!confirm('確定建立／補齊 1～35 與 99 的學生登入帳號？此動作只需執行一次。'))return;
@@ -454,7 +460,7 @@ async function loadOverview(){
     (noteRows.length?'<div class="order-notes-summary"><h3>備註</h3>'+noteRows.map(x=>'<div class="item-stat-row"><span><b>'+esc(x.seat+'號'+(x.name?' '+x.name:''))+'</b><br><small>'+esc(x.item)+'</small></span><strong>'+esc(x.note)+'</strong></div>').join('')+'</div>':'');
 
   const bySeat=new Map();for(const o of list){const st=students.find(s=>s.id===o.student_id),seat=st?.seat_number||Number(o.student_name);if(seat)bySeat.set(seat,{...o,name:st?.name||''})}
-  const seats=[...Array.from({length:35},(_,i)=>i+1),99];
+  const seats=[...Array.from({length:35},(_,i)=>i+1),0,99];
   $('seatPayments').innerHTML='<div class="seat-grid">'+seats.map(n=>{
     const o=bySeat.get(n),st=students.find(s=>s.seat_number===n),hasMarket=o&&marketByOrder.has(o.id),unresolved=o&&unresolvedOrders.has(o.id);
     return '<div class="seat-card '+(!o?'seat-empty':o.paid?'seat-paid':'seat-unpaid')+'"><b>'+n+'號'+(st?.name?' '+esc(st.name):'')+'</b><span>'+(!o?'未訂':o.paid?'✓ 已付款':'未付款')+'</span>'+

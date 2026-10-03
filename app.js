@@ -356,8 +356,19 @@ async function openAccountDialog(){
 
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
-  const seat=Number($('seatLogin').value),raw=$('passwordLogin').value;
-  if(!validSeat(seat))return toast('座號不正確');
+  const account=String($('seatLogin').value||'').trim().toLowerCase(),raw=$('passwordLogin').value;
+
+  if(account==='tch'){
+    const{data,error}=await db.functions.invoke('class-lunch-teacher-login',{body:{account:'tch',password:raw}});
+    if(error||data?.error)return toast('帳號或密碼錯誤');
+    if(!data?.access_token||!data?.refresh_token)return toast('老師登入失敗');
+    const{error:setError}=await db.auth.setSession({access_token:data.access_token,refresh_token:data.refresh_token});
+    if(setError)return toast('登入失敗：'+setError.message);
+    $('passwordLogin').value='';return refresh();
+  }
+
+  const seat=Number(account);
+  if(!validSeat(seat))return toast('帳號不正確');
   if(seat===99&&raw!=='099')return toast('座號或密碼錯誤');
   if(raw===String(seat).padStart(3,'0')){
     const{data:initData,error:initError}=await db.functions.invoke('class-lunch-init-login',{body:{seat_number:seat,initial_code:raw}});
@@ -375,13 +386,18 @@ $('loginForm').addEventListener('submit',async e=>{
 
 $('setupForm').addEventListener('submit',async e=>{
   e.preventDefault();
+  const isTeacher=student?.seat_number===0;
   const name=$('setupName').value.trim(),p1=$('setupPassword').value,p2=$('setupPassword2').value;
-  if(!name)return toast('請輸入姓名');
+  if(!isTeacher&&!name)return toast('請輸入姓名');
   if(p1.length<4)return toast('新密碼至少 4 碼');
+  if(isTeacher&&p1==='tch')return toast('新密碼不能繼續使用初始密碼 tch');
   if(p1!==p2)return toast('兩次密碼不一致');
   const b=e.currentTarget.querySelector('button[type="submit"]');b.disabled=true;b.textContent='設定中…';
-  const{data,error}=await db.functions.invoke('class-lunch-students',{body:{action:'self_setup',name,password:p1}});
+  const result=isTeacher
+    ?await db.functions.invoke('class-lunch-teacher-password',{body:{password:p1}})
+    :await db.functions.invoke('class-lunch-students',{body:{action:'self_setup',name,password:p1}});
   b.disabled=false;b.textContent='完成設定';
+  const{data,error}=result;
   if(error||data?.error)return toast('設定失敗：'+(data?.detail||data?.error||error.message));
   $('setupForm').reset();toast('設定完成');await refresh();
 });
@@ -458,9 +474,16 @@ async function refresh(){
   $('heroIdentity').textContent=s.seat_number+'號 '+(s.name||'');
 
   if(s.must_setup&&s.seat_number!==99){
-    $('notifyBtn').classList.add('hidden');$('accountBtn').classList.add('hidden');$('historyBtn').classList.add('hidden');$('adminLink').classList.add('hidden');$('studentApp').classList.add('hidden');$('setupBox').classList.remove('hidden');$('welcomeText').textContent=s.seat_number+'號第一次登入設定';return;
+    const isTeacher=s.seat_number===0;
+    $('setupTitle').textContent=isTeacher?'老師第一次登入':'第一次登入設定';
+    $('setupHint').textContent=isTeacher?'初始密碼必須更換後才能使用訂餐；老師名稱固定，不需要設定姓名。':'請先設定姓名並更換密碼。姓名完成設定後只能由管理員修改。';
+    $('setupNameField').classList.toggle('hidden',isTeacher);
+    $('setupName').required=!isTeacher;
+    if(isTeacher)$('setupName').value='老師';
+    $('notifyBtn').classList.add('hidden');$('accountBtn').classList.add('hidden');$('historyBtn').classList.add('hidden');$('adminLink').classList.add('hidden');$('studentApp').classList.add('hidden');$('setupBox').classList.remove('hidden');$('welcomeText').textContent=isTeacher?'0號 老師 · 請先更換初始密碼':s.seat_number+'號第一次登入設定';return;
   }
   $('notifyBtn').classList.remove('hidden');$('accountBtn').classList.remove('hidden');$('setupBox').classList.add('hidden');$('studentApp').classList.remove('hidden');
+  $('setupNameField').classList.remove('hidden');$('setupName').required=true;
   $('welcomeText').textContent='歡迎回來，'+(s.name||s.seat_number+'號')+'。看看今天想吃什麼。';
   setTimeout(()=>refreshPushStatus(),0);
   await loadSessions();
