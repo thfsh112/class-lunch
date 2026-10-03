@@ -455,8 +455,9 @@ $('orderDialogForm').addEventListener('submit',async e=>{
     const items=[...counts.entries()].map(([menu_item_id,qty])=>({menu_item_id,qty}));
     const r=await db.rpc('place_class_lunch_order_v4',{p_session_id:editingSessionId,p_items:items,p_note:note});error=r.error;
   }else{
-    const item=$('orderItem').value.trim(),amount=Number($('orderAmount').value);
+    const item=$('orderItem').value.trim(),amountRaw=$('orderAmount').value.trim(),amount=Number(amountRaw);
     if(!item){b.disabled=false;b.textContent='儲存訂單';return toast('請輸入品項')}
+    if(amountRaw===''||!Number.isInteger(amount)||amount<0||amount>10000){b.disabled=false;b.textContent='儲存訂單';return toast('請輸入 0～10000 的整數金額')}
     const r=await db.rpc('place_class_lunch_order_v2',{p_session_id:editingSessionId,p_item_name:item,p_unit_price:amount,p_note:note});error=r.error;
   }
   b.disabled=false;b.textContent='儲存訂單';
