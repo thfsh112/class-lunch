@@ -57,14 +57,29 @@ function refreshInstallStatus(){
     return;
   }
   box.classList.remove('hidden');
+  const pwa=window.CLASS_LUNCH_PWA_STATUS;
+  if(pwa&&pwa.supported===false){
+    text.textContent='此瀏覽器不支援 Service Worker，無法安裝完整 App。';
+    btn.disabled=true;
+    return;
+  }
+  if(pwa&&pwa.error){
+    text.textContent='PWA 服務啟動失敗：'+pwa.error;
+    btn.disabled=true;
+    return;
+  }
   if(deferredInstallPrompt){
     text.textContent='已符合 App 安裝條件，可直接安裝。';
     btn.disabled=false;
     btn.textContent='安裝 App';
-  }else{
-    text.textContent='Chrome 正在確認 App 安裝資格；請先在此頁停留並操作一下。';
+  }else if(pwa?.ready){
+    text.textContent='PWA 服務已就緒，等待 Chrome 提供安裝資格。';
     btn.disabled=false;
     btn.textContent='檢查並安裝';
+  }else{
+    text.textContent='正在啟動 PWA 服務…';
+    btn.disabled=true;
+    btn.textContent='準備中';
   }
 }
 window.addEventListener('beforeinstallprompt',event=>{
@@ -72,6 +87,7 @@ window.addEventListener('beforeinstallprompt',event=>{
   deferredInstallPrompt=event;
   refreshInstallStatus();
 });
+window.addEventListener('class-lunch-pwa-status',refreshInstallStatus);
 window.addEventListener('appinstalled',()=>{
   deferredInstallPrompt=null;
   refreshInstallStatus();
