@@ -1,5 +1,5 @@
 {
-  "id": "./",
+  "id": "/class-lunch/",
   "name": "班級訂飯",
   "short_name": "班級訂飯",
   "description": "班級午餐訂餐系統",
@@ -11,13 +11,13 @@
   "theme_color": "#f7e7c6",
   "icons": [
     {
-      "src": "./install-icon-192.png?v=20261003-03",
+      "src": "./install-icon-192.png?v=20261003-04",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icon-512.svg?v=20261003-03",
+      "src": "./icon-512.svg?v=20261003-04",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any"
