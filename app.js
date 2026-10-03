@@ -254,6 +254,7 @@ $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const seat=Number($('seatLogin').value),raw=$('passwordLogin').value;
   if(!validSeat(seat))return toast('座號不正確');
+  if(seat===99&&raw!=='099')return toast('座號或密碼錯誤');
   if(raw===String(seat).padStart(3,'0')){
     const{data:initData,error:initError}=await db.functions.invoke('class-lunch-init-login',{body:{seat_number:seat,initial_code:raw}});
     if(initError||initData?.error)return toast('初始登入失敗：'+(initData?.detail||initData?.error||initError?.message||'未知錯誤'));
