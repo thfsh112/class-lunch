@@ -1,7 +1,7 @@
 const{createClient}=supabase;
 const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=id=>document.getElementById(id);
-let student=null,sessions=[],orders=[],menuItems=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,realtimeChannel=null,realtimeTimer=null,deferredInstallPrompt=null;
+let student=null,sessions=[],orders=[],menuItems=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,realtimeChannel=null,realtimeTimer=null,deferredInstallPrompt=null,notificationPermissionStatus=null,pushPermissionSyncing=false;
 const money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
 const PUSH_VAPID_PUBLIC_KEY='BIfooHITgKhbwNm9ufy7fUdoyaU46cxxSFFoAOPQrKHJ4RPHzsqYQb9CEMWflB4PlXmpyptPHWl-fvgiWjeW_kE';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
@@ -105,6 +105,47 @@ async function upsertCurrentPushSubscription(subscription){
   },{onConflict:'endpoint'});
   if(error)throw error;
 }
+async function syncPushAfterPermissionGranted(showToast=true){
+  if(pushPermissionSyncing||!student||Notification.permission!=='granted')return;
+  pushPermissionSyncing=true;
+  try{
+    const reg=await getPushRegistration();
+    if(!reg)throw new Error('service_worker_missing');
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      sub=await reg.pushManager.subscribe({
+        userVisibleOnly:true,
+        applicationServerKey:urlBase64ToUint8Array(PUSH_VAPID_PUBLIC_KEY)
+      });
+    }
+    await upsertCurrentPushSubscription(sub);
+    await refreshPushStatus();
+    if(showToast)toast('訂餐通知已開啟');
+  }catch(error){
+    console.error('push_permission_sync_failed',error);
+    const status=$('pushStatusText');
+    if(status)status.textContent='通知已允許，但推播訂閱建立失敗：'+String(error?.message||error);
+  }finally{
+    pushPermissionSyncing=false;
+  }
+}
+async function watchNotificationPermission(){
+  if(!('permissions' in navigator)||!('Notification' in window))return;
+  try{
+    notificationPermissionStatus=await navigator.permissions.query({name:'notifications'});
+    notificationPermissionStatus.onchange=async()=>{
+      await refreshPushStatus();
+      if(notificationPermissionStatus.state==='granted'){
+        await syncPushAfterPermissionGranted(true);
+      }
+    };
+    if(notificationPermissionStatus.state==='granted'){
+      await syncPushAfterPermissionGranted(false);
+    }
+  }catch(error){
+    console.warn('notification_permission_watch_failed',error);
+  }
+}
 async function refreshPushStatus(){
   const status=$('pushStatusText'),enable=$('enablePushBtn'),disable=$('disablePushBtn');
   if(!status||!enable||!disable)return;
@@ -134,7 +175,13 @@ async function enablePushNotifications(){
   const permission=await Notification.requestPermission();
   if(permission!=='granted'){
     await refreshPushStatus();
-    return toast('尚未允許通知（目前權限：'+permission+'）');
+    if(permission==='default'){
+      const status=$('pushStatusText');
+      const msg='Chrome 尚未取得決定。請點網址列左邊的網站控制圖示 → 通知 → 允許；允許後會自動完成設定。';
+      if(status)status.textContent=msg;
+      return toast('請從網址列左邊的網站控制開啟通知');
+    }
+    return toast('通知已被封鎖，請到網站權限重新允許');
   }
   try{
     const reg=await getPushRegistration();
@@ -271,7 +318,7 @@ async function refresh(){
   }
   const{data:s,error}=await db.from('students').select('id,seat_number,name,active,must_setup').eq('auth_user_id',user.id).maybeSingle();
   if(error||!s||!s.active){await db.auth.signOut();toast('此學生帳號目前無法使用');return refresh()}
-  student=s;startStudentRealtime();$('loginBox').classList.add('hidden');$('heroAccount').classList.remove('hidden');$('logoutBtn').classList.remove('hidden');$('historyBtn').classList.remove('hidden');
+  student=s;startStudentRealtime();watchNotificationPermission();$('loginBox').classList.add('hidden');$('heroAccount').classList.remove('hidden');$('logoutBtn').classList.remove('hidden');$('historyBtn').classList.remove('hidden');
   $('adminLink').classList.toggle('hidden',s.seat_number!==99);
   $('heroIdentity').textContent=s.seat_number+'號 '+(s.name||'');
 
@@ -482,4 +529,5 @@ setInterval(()=>{if(student&&sessions.length)renderSessions()},30000);
 db.auth.onAuthStateChange(()=>setTimeout(refresh,0));
 refreshInstallStatus();
 setTimeout(refreshInstallStatus,32000);
+watchNotificationPermission();
 refresh();
