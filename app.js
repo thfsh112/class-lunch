@@ -3,6 +3,7 @@ const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{pe
 const $=id=>document.getElementById(id);
 let student=null,sessions=[],orders=[],menuItems=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,realtimeChannel=null,realtimeTimer=null;
 const money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
+const PUSH_VAPID_PUBLIC_KEY='BIfooHITgKhbwNm9ufy7fUdoyaU46cxxSFFoAOPQrKHJ4RPHzsqYQb9CEMWflB4PlXmpyptPHWl-fvgiWjeW_kE';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const today=()=>new Date().toLocaleDateString('en-CA');
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
@@ -21,6 +22,112 @@ function countdown(s){
 function validSeat(seat){return Number.isInteger(seat)&&((seat>=1&&seat<=35)||seat===99)}
 function internalEmail(seat){return 'seat'+String(Number(seat)).padStart(2,'0')+'@class-lunch.example'}
 function authPassword(raw){return 'CLP:'+String(raw)+':2026'}
+function urlBase64ToUint8Array(base64String){
+  const padding='='.repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const rawData=atob(base64);
+  return Uint8Array.from([...rawData].map(ch=>ch.charCodeAt(0)));
+}
+async function getPushRegistration(){
+  if(!('serviceWorker' in navigator))return null;
+  const direct=await navigator.serviceWorker.getRegistration('/class-lunch/');
+  return direct||await navigator.serviceWorker.ready;
+}
+async function getCurrentPushSubscription(){
+  try{
+    const reg=await getPushRegistration();
+    return reg?await reg.pushManager.getSubscription():null;
+  }catch{return null}
+}
+async function upsertCurrentPushSubscription(subscription){
+  if(!student||!subscription)return;
+  const json=subscription.toJSON();
+  if(!json.endpoint||!json.keys?.p256dh||!json.keys?.auth)throw new Error('subscription_keys_missing');
+  const{error}=await db.from('class_lunch_push_subscriptions').upsert({
+    student_id:student.id,
+    endpoint:json.endpoint,
+    p256dh:json.keys.p256dh,
+    auth_secret:json.keys.auth
+  },{onConflict:'endpoint'});
+  if(error)throw error;
+}
+async function refreshPushStatus(){
+  const status=$('pushStatusText'),enable=$('enablePushBtn'),disable=$('disablePushBtn');
+  if(!status||!enable||!disable)return;
+  if(!('Notification' in window)||!('PushManager' in window)||!('serviceWorker' in navigator)){
+    status.textContent='此瀏覽器不支援系統推播通知。';
+    enable.disabled=true;disable.classList.add('hidden');return;
+  }
+  const sub=await getCurrentPushSubscription();
+  if(Notification.permission==='granted'&&sub){
+    status.textContent='通知已開啟。';
+    enable.classList.add('hidden');disable.classList.remove('hidden');
+    if(student){try{await upsertCurrentPushSubscription(sub)}catch(error){console.warn('push_sync_failed',error)}}
+    return;
+  }
+  enable.classList.remove('hidden');disable.classList.add('hidden');
+  if(Notification.permission==='denied'){
+    status.textContent='通知權限已被封鎖，請到瀏覽器或系統設定重新允許。';
+    enable.disabled=true;
+  }else{
+    status.textContent='目前尚未開啟通知。';
+    enable.disabled=false;
+  }
+}
+async function enablePushNotifications(){
+  if(!student)return toast('請先登入');
+  if(!('Notification' in window)||!('PushManager' in window)||!('serviceWorker' in navigator))return toast('此裝置不支援推播通知');
+  const permission=await Notification.requestPermission();
+  if(permission!=='granted'){await refreshPushStatus();return toast('尚未允許通知')}
+  try{
+    const reg=await getPushRegistration();
+    if(!reg)throw new Error('service_worker_missing');
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      sub=await reg.pushManager.subscribe({
+        userVisibleOnly:true,
+        applicationServerKey:urlBase64ToUint8Array(PUSH_VAPID_PUBLIC_KEY)
+      });
+    }
+    await upsertCurrentPushSubscription(sub);
+    await refreshPushStatus();
+    toast('訂餐通知已開啟');
+  }catch(error){
+    console.error(error);
+    toast('開啟通知失敗');
+  }
+}
+async function disablePushNotifications(){
+  try{
+    const sub=await getCurrentPushSubscription();
+    if(sub){
+      if(student){
+        const{error}=await db.from('class_lunch_push_subscriptions').delete().eq('endpoint',sub.endpoint);
+        if(error)throw error;
+      }
+      await sub.unsubscribe();
+    }
+    await refreshPushStatus();
+    toast('訂餐通知已關閉');
+  }catch(error){
+    console.error(error);
+    toast('關閉通知失敗');
+  }
+}
+async function detachPushBeforeLogout(){
+  try{
+    const sub=await getCurrentPushSubscription();
+    if(!sub)return;
+    if(student)await db.from('class_lunch_push_subscriptions').delete().eq('endpoint',sub.endpoint);
+    await sub.unsubscribe();
+  }catch(error){console.warn('push_logout_cleanup_failed',error)}
+}
+async function openAccountDialog(){
+  $('passwordForm').reset();
+  $('accountDialog').showModal();
+  await refreshPushStatus();
+}
+
 
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
@@ -53,8 +160,11 @@ $('setupForm').addEventListener('submit',async e=>{
   $('setupForm').reset();toast('設定完成');await refresh();
 });
 
-$('logoutBtn').addEventListener('click',async()=>{await db.auth.signOut();student=null;refresh()});
-$('accountBtn').addEventListener('click',()=>{$('passwordForm').reset();$('accountDialog').showModal()});
+$('logoutBtn').addEventListener('click',async()=>{await detachPushBeforeLogout();await db.auth.signOut();student=null;refresh()});
+$('accountBtn').addEventListener('click',openAccountDialog);
+$('notifyBtn').addEventListener('click',openAccountDialog);
+$('enablePushBtn').addEventListener('click',enablePushNotifications);
+$('disablePushBtn').addEventListener('click',disablePushNotifications);
 $('historyBtn').addEventListener('click',openHistory);
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>$(b.dataset.close).close()));
 
@@ -75,7 +185,7 @@ async function refresh(){
   if(!user){
     stopStudentRealtime();
     $('loginBox').classList.remove('hidden');$('setupBox').classList.add('hidden');$('studentApp').classList.add('hidden');
-    $('heroAccount').classList.add('hidden');$('logoutBtn').classList.add('hidden');$('accountBtn').classList.add('hidden');$('historyBtn').classList.add('hidden');$('adminLink').classList.add('hidden');
+    $('heroAccount').classList.add('hidden');$('logoutBtn').classList.add('hidden');$('notifyBtn').classList.add('hidden');$('accountBtn').classList.add('hidden');$('historyBtn').classList.add('hidden');$('adminLink').classList.add('hidden');
     $('welcomeText').textContent='登入後查看開放中的訂餐。';return;
   }
   const{data:s,error}=await db.from('students').select('id,seat_number,name,active,must_setup').eq('auth_user_id',user.id).maybeSingle();
@@ -85,10 +195,11 @@ async function refresh(){
   $('heroIdentity').textContent=s.seat_number+'號 '+(s.name||'');
 
   if(s.must_setup&&s.seat_number!==99){
-    $('accountBtn').classList.add('hidden');$('historyBtn').classList.add('hidden');$('adminLink').classList.add('hidden');$('studentApp').classList.add('hidden');$('setupBox').classList.remove('hidden');$('welcomeText').textContent=s.seat_number+'號第一次登入設定';return;
+    $('notifyBtn').classList.add('hidden');$('accountBtn').classList.add('hidden');$('historyBtn').classList.add('hidden');$('adminLink').classList.add('hidden');$('studentApp').classList.add('hidden');$('setupBox').classList.remove('hidden');$('welcomeText').textContent=s.seat_number+'號第一次登入設定';return;
   }
-  $('accountBtn').classList.remove('hidden');$('setupBox').classList.add('hidden');$('studentApp').classList.remove('hidden');
+  $('notifyBtn').classList.remove('hidden');$('accountBtn').classList.remove('hidden');$('setupBox').classList.add('hidden');$('studentApp').classList.remove('hidden');
   $('welcomeText').textContent='歡迎回來，'+(s.name||s.seat_number+'號')+'。看看今天想吃什麼。';
+  setTimeout(()=>refreshPushStatus(),0);
   await loadSessions();
 }
 
