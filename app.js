@@ -1,5 +1,5 @@
 const{createClient}=supabase;
-const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage}});
 const $=id=>document.getElementById(id);
 let student=null,sessions=[],orders=[],menuItems=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,realtimeChannel=null,realtimeTimer=null,deferredInstallPrompt=null,notificationPermissionStatus=null,pushPermissionSyncing=false;
 const money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
@@ -316,15 +316,27 @@ $('passwordForm').addEventListener('submit',async e=>{
 });
 
 async function refresh(){
-  const{data:{user}}=await db.auth.getUser();
-  if(!user){
+  const{data:{session}}=await db.auth.getSession();
+  if(!session){
     stopStudentRealtime();
+    student=null;
     $('loginBox').classList.remove('hidden');$('setupBox').classList.add('hidden');$('studentApp').classList.add('hidden');
     $('heroAccount').classList.add('hidden');$('logoutBtn').classList.add('hidden');$('notifyBtn').classList.add('hidden');$('accountBtn').classList.add('hidden');$('historyBtn').classList.add('hidden');$('adminLink').classList.add('hidden');
     $('welcomeText').textContent='登入後查看開放中的訂餐。';return;
   }
+
+  const{data:{user},error:userError}=await db.auth.getUser();
+  if(userError||!user){
+    $('welcomeText').textContent='登入狀態仍保留，等待網路恢復後會自動重試。';
+    return;
+  }
+
   const{data:s,error}=await db.from('students').select('id,seat_number,name,active,must_setup').eq('auth_user_id',user.id).maybeSingle();
-  if(error||!s||!s.active){await db.auth.signOut();toast('此學生帳號目前無法使用');return refresh()}
+  if(error){
+    $('welcomeText').textContent='登入狀態仍保留，學生資料暫時讀取失敗。';
+    return;
+  }
+  if(!s||!s.active){await db.auth.signOut();student=null;toast('此學生帳號目前無法使用');return refresh()}
   student=s;startStudentRealtime();watchNotificationPermission();$('loginBox').classList.add('hidden');$('heroAccount').classList.remove('hidden');$('logoutBtn').classList.remove('hidden');$('historyBtn').classList.remove('hidden');
   $('adminLink').classList.toggle('hidden',s.seat_number!==99);
   $('heroIdentity').textContent=s.seat_number+'號 '+(s.name||'');
