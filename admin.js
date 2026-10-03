@@ -368,7 +368,7 @@ $('studentEditForm').addEventListener('submit',async e=>{
   const{data,error}=await db.functions.invoke('class-lunch-students',{body:{action:'update',student_id:s.id,name,active}});
   if(error||data?.error)return toast('更新失敗：'+(data?.detail||data?.error||error.message));
   if(pw){
-    if(!(s.seat_number===99&&pw==='099')&&pw.length<4)return toast('密碼至少 4 碼');
+    if(!(s.seat_number===99&&pw==='099')&&!(s.seat_number===0&&pw==='tch')&&pw.length<4)return toast('密碼至少 4 碼');
     const r=await db.functions.invoke('class-lunch-students',{body:{action:'reset_password',student_id:s.id,password:pw}});
     if(r.error||r.data?.error)return toast('資料已更新，但密碼重設失敗');
   }
@@ -459,8 +459,8 @@ async function loadOverview(){
     (itemRows.length?'<div class="item-stats-table">'+itemRows.map(([name,qty])=>'<div class="item-stat-row"><span>'+esc(name)+(name.includes('（時價）')?' <em class="market-badge">時價</em>':'')+'</span><b>'+qty+' 份</b></div>').join('')+'</div>':'<div class="loading">目前沒有品項</div>')+
     (noteRows.length?'<div class="order-notes-summary"><h3>備註</h3>'+noteRows.map(x=>'<div class="item-stat-row"><span><b>'+esc(x.seat+'號'+(x.name?' '+x.name:''))+'</b><br><small>'+esc(x.item)+'</small></span><strong>'+esc(x.note)+'</strong></div>').join('')+'</div>':'');
 
-  const bySeat=new Map();for(const o of list){const st=students.find(s=>s.id===o.student_id),seat=st?.seat_number||Number(o.student_name);if(seat)bySeat.set(seat,{...o,name:st?.name||''})}
-  const seats=[...Array.from({length:35},(_,i)=>i+1),0,99];
+  const bySeat=new Map();for(const o of list){const st=students.find(s=>s.id===o.student_id),seat=st?.seat_number??Number(o.student_name);if(Number.isInteger(Number(seat)))bySeat.set(Number(seat),{...o,name:st?.name||''})}
+  const seats=[0,...Array.from({length:35},(_,i)=>i+1),99];
   $('seatPayments').innerHTML='<div class="seat-grid">'+seats.map(n=>{
     const o=bySeat.get(n),st=students.find(s=>s.seat_number===n),hasMarket=o&&marketByOrder.has(o.id),unresolved=o&&unresolvedOrders.has(o.id);
     return '<div class="seat-card '+(!o?'seat-empty':o.paid?'seat-paid':'seat-unpaid')+'"><b>'+n+'號'+(st?.name?' '+esc(st.name):'')+'</b><span>'+(!o?'未訂':o.paid?'✓ 已付款':'未付款')+'</span>'+

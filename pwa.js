@@ -1,5 +1,5 @@
 (()=>{
-  const DISPLAY_VERSION="1.40";
+  const DISPLAY_VERSION="1.41";
   document.querySelectorAll("[data-app-version]").forEach(btn=>{
     btn.textContent=DISPLAY_VERSION;
     btn.addEventListener("click",async()=>{
