@@ -391,10 +391,26 @@ async function loadOverview(){
   $('statTotal').textContent=money(total)+(unresolvedOrders.size?' ＋ 時價':'');
   const itemRows=[...itemCounts.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'zh-Hant'));
   const totalQty=itemRows.reduce((a,x)=>a+x[1],0);
+  const noteRows=list
+    .map(o=>{
+      const note=String(o.note||'').trim();
+      if(!note)return null;
+      const st=students.find(x=>x.id===o.student_id);
+      const seat=st?.seat_number||Number(o.student_name)||'？';
+      const name=st?.name||'';
+      return {seat,name,item:o.item_name||'未記錄品項',note};
+    })
+    .filter(Boolean)
+    .sort((a,b)=>Number(a.seat||999)-Number(b.seat||999));
   const sessionLabel=[s?.meal_date,s?.menu_templates?.name||'菜單'].filter(Boolean).join(' ');
   latestOverviewCopyText=[
     '【'+sessionLabel+' 訂餐統計】',
     ...(itemRows.length?itemRows.map(([name,qty])=>name+'：'+qty+'份'):['目前沒有品項']),
+    ...(noteRows.length?[
+      '────────',
+      '【備註】',
+      ...noteRows.map(x=>x.seat+'號'+(x.name?' '+x.name:'')+'｜'+x.item+'｜'+x.note)
+    ]:[]),
     '────────',
     '總份數：'+totalQty+'份',
     '已訂：'+list.length+'人',
@@ -402,7 +418,8 @@ async function loadOverview(){
     '總金額：'+money(total)+(unresolvedOrders.size?' ＋ 時價':'')
   ].join('\n');
   $('itemStats').innerHTML='<div class="item-stats-head"><h3>品項統計</h3><div class="btnrow"><span>'+totalQty+' 份</span><button class="small-btn" type="button" onclick="copyOverviewStats()">一鍵複製 LINE</button></div></div>'+
-    (itemRows.length?'<div class="item-stats-table">'+itemRows.map(([name,qty])=>'<div class="item-stat-row"><span>'+esc(name)+(name.includes('（時價）')?' <em class="market-badge">時價</em>':'')+'</span><b>'+qty+' 份</b></div>').join('')+'</div>':'<div class="loading">目前沒有品項</div>');
+    (itemRows.length?'<div class="item-stats-table">'+itemRows.map(([name,qty])=>'<div class="item-stat-row"><span>'+esc(name)+(name.includes('（時價）')?' <em class="market-badge">時價</em>':'')+'</span><b>'+qty+' 份</b></div>').join('')+'</div>':'<div class="loading">目前沒有品項</div>')+
+    (noteRows.length?'<div class="order-notes-summary"><h3>備註</h3>'+noteRows.map(x=>'<div class="item-stat-row"><span><b>'+esc(x.seat+'號'+(x.name?' '+x.name:''))+'</b><br><small>'+esc(x.item)+'</small></span><strong>'+esc(x.note)+'</strong></div>').join('')+'</div>':'');
 
   const bySeat=new Map();for(const o of list){const st=students.find(s=>s.id===o.student_id),seat=st?.seat_number||Number(o.student_name);if(seat)bySeat.set(seat,{...o,name:st?.name||''})}
   const seats=[...Array.from({length:35},(_,i)=>i+1),99];
