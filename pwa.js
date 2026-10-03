@@ -30,8 +30,8 @@
     try{
       await cleanupOldRegistrations();
       let reg=await navigator.serviceWorker.register(
-        "/class-lunch/service-worker.js?v=20261003-19",
-        {scope:"/class-lunch/",updateViaCache:"none"}
+        "./service-worker.js",
+        {scope:"./",updateViaCache:"none"}
       );
       await navigator.serviceWorker.ready;
       try{await reg.update()}catch{}
