@@ -85,7 +85,10 @@ async function enablePushNotifications(){
   if(!student)return toast('請先登入');
   if(!('Notification' in window)||!('PushManager' in window)||!('serviceWorker' in navigator))return toast('此裝置不支援推播通知');
   const permission=await Notification.requestPermission();
-  if(permission!=='granted'){await refreshPushStatus();return toast('尚未允許通知')}
+  if(permission!=='granted'){
+    await refreshPushStatus();
+    return toast('尚未允許通知（目前權限：'+permission+'）');
+  }
   try{
     const reg=await getPushRegistration();
     if(!reg)throw new Error('service_worker_missing');
