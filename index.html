@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>班級訂飯 🍱</title>
-<link rel="icon" type="image/png" href="./icon-192.png?v=20261003-38">
-<link rel="apple-touch-icon" href="./icon-192.png?v=20261003-38">
+<link rel="icon" type="image/png" href="./icon-192.png?v=20261003-39">
+<link rel="apple-touch-icon" href="./icon-192.png?v=20261003-39">
 <meta name="theme-color" content="#f7e7c6">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="班級訂飯">
-<link rel="manifest" href="./manifest.webmanifest?v=20261003-38">
-<link rel="stylesheet" href="style.css?v=20261003-38">
+<link rel="manifest" href="./manifest.webmanifest?v=20261003-39">
+<link rel="stylesheet" href="style.css?v=20261003-39">
 </head>
 <body>
 <header class="top hero">
@@ -73,6 +73,26 @@
 </div>
 </main>
 
+<dialog id="iosInstallDialog" class="form-dialog ios-install-dialog">
+  <div class="ios-install-shell">
+    <div class="dialog-head">
+      <div><small>iPhone / iPad</small><h2>安裝班級訂飯 App</h2></div>
+      <button type="button" class="close-dialog" data-close="iosInstallDialog">×</button>
+    </div>
+    <p class="hint">Apple 系統需要從瀏覽器選單加入主畫面，無法像 Android 一樣由網頁直接跳出安裝視窗。</p>
+    <ol class="ios-install-steps">
+      <li><b>用 Safari 開啟這個頁面</b><span>如果目前就在 Safari，可直接進行下一步。</span></li>
+      <li><b>點下方的「分享」按鈕</b><span>圖示是方框上方有一個向上的箭頭。</span></li>
+      <li><b>選「加入主畫面」</b><span>若看到「打開為網頁 App」，請保持開啟。</span></li>
+      <li><b>按右上角「加入」</b><span>完成後從主畫面開啟「班級訂飯」即可。</span></li>
+    </ol>
+    <div class="dialog-actions">
+      <button id="copyInstallUrlBtn" type="button" class="ghost">複製網址</button>
+      <button type="button" class="primary" data-close="iosInstallDialog">我知道了</button>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="orderDialog" class="form-dialog">
   <form id="orderDialogForm">
     <div class="dialog-head"><div><small id="orderDialogDate"></small><h2 id="orderDialogTitle">訂餐</h2></div><button type="button" class="close-dialog" data-close="orderDialog">×</button></div>
@@ -133,6 +153,6 @@
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.APP_CONFIG={supabaseUrl:"https://roynzxilxumfzzuezelg.supabase.co",publishableKey:"sb_publishable_nvmHzVjH7bZ8F9cnJYzKCg_PSPlhCXU"};</script>
-<script src="pwa.js?v=20261003-38"></script>
-<script src="app.js?v=20261003-38"></script>
+<script src="pwa.js?v=20261003-39"></script>
+<script src="app.js?v=20261003-39"></script>
 </body></html>

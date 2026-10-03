@@ -16,3 +16,14 @@
 @media(max-width:560px){.notification-settings{flex-direction:column}.notification-actions{width:100%;flex-direction:row}.notification-actions button{flex:1}}
 
 .pwa-install-panel{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:-22px}.pwa-install-panel h3{margin:0 0 4px}.pwa-install-panel p{margin:0}.pwa-install-panel .primary{white-space:nowrap}@media(max-width:520px){.pwa-install-panel{align-items:stretch;flex-direction:column}.pwa-install-panel .primary{width:100%}}
+
+
+/* iPhone / iPad PWA install guide */
+.ios-install-shell{padding:4px 2px}
+.ios-install-shell>.hint{margin:0 0 16px;line-height:1.65}
+.ios-install-steps{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+.ios-install-steps li{counter-increment:ios-step;position:relative;padding:12px 12px 12px 48px;border:1px solid rgba(120,87,67,.18);border-radius:14px;background:rgba(255,250,246,.76)}
+.ios-install-steps{counter-reset:ios-step}
+.ios-install-steps li::before{content:counter(ios-step);position:absolute;left:12px;top:12px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:#bf7b68;color:#fff}
+.ios-install-steps b,.ios-install-steps span{display:block}
+.ios-install-steps span{margin-top:3px;font-size:.9rem;color:#806b60;line-height:1.45}

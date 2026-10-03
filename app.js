@@ -138,6 +138,14 @@ async function getCurrentPushSubscription(){
 function isStandalonePwa(){
   return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
 }
+function isAppleMobile(){
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent)||
+    (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+}
+function isSafariBrowser(){
+  const ua=navigator.userAgent;
+  return /Safari/i.test(ua)&&!/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua);
+}
 function refreshInstallStatus(){
   const box=$('installBox'),btn=$('installAppBtn'),text=$('installStatusText');
   if(!box||!btn||!text)return;
@@ -146,6 +154,14 @@ function refreshInstallStatus(){
     return;
   }
   box.classList.remove('hidden');
+  if(isAppleMobile()){
+    text.textContent=isSafariBrowser()
+      ?'iPhone / iPad 可安裝為主畫面 App。'
+      :'Apple 系統可安裝 App；建議用 Safari 開啟後加入主畫面。';
+    btn.disabled=false;
+    btn.textContent='安裝 App';
+    return;
+  }
   const pwa=window.CLASS_LUNCH_PWA_STATUS;
   if(pwa&&pwa.supported===false){
     text.textContent='此瀏覽器不支援 Service Worker，無法安裝完整 App。';
@@ -378,6 +394,10 @@ $('disablePushBtn').addEventListener('click',disablePushNotifications);
 $('historyBtn').addEventListener('click',openHistory);
 $('installAppBtn').addEventListener('click',async()=>{
   if(isStandalonePwa())return toast('已經是 App 模式');
+  if(isAppleMobile()){
+    $('iosInstallDialog').showModal();
+    return;
+  }
   if(!deferredInstallPrompt){
     refreshInstallStatus();
     return toast('Chrome 尚未提供安裝；請在頁面停留約 30 秒後再按一次');
@@ -387,6 +407,14 @@ $('installAppBtn').addEventListener('click',async()=>{
   deferredInstallPrompt=null;
   refreshInstallStatus();
   if(choice?.outcome==='accepted')toast('正在安裝班級訂飯');
+});
+$('copyInstallUrlBtn')?.addEventListener('click',async()=>{
+  try{
+    await navigator.clipboard.writeText(location.href);
+    toast('網址已複製，可貼到 Safari 開啟');
+  }catch{
+    toast('複製失敗，請直接用 Safari 開啟目前網址');
+  }
 });
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>$(b.dataset.close).close()));
 
