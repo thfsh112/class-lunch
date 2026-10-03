@@ -30,16 +30,16 @@ function urlBase64ToUint8Array(base64String){
 }
 async function getPushRegistration(){
   if(!('serviceWorker' in navigator))return null;
-  const scopeUrl=new URL('./',location.href).href;
-  const workerUrl=new URL('./service-worker.js',location.href).href;
-  const regs=await navigator.serviceWorker.getRegistrations();
-  let reg=regs.find(r=>r.scope===scopeUrl||r.active?.scriptURL?.split('?')[0]===workerUrl);
-  if(!reg){
-    reg=await navigator.serviceWorker.register('./service-worker.js',{scope:'./',updateViaCache:'none'});
+  const expectedScope=new URL('/class-lunch/',location.origin).href;
+  let reg=window.CLASS_LUNCH_PWA_STATUS?.registration||null;
+  if(!reg||reg.scope!==expectedScope){
+    reg=await navigator.serviceWorker.getRegistration('/class-lunch/');
   }
-  await reg.update().catch(()=>null);
-  if(!reg.active)reg=await navigator.serviceWorker.ready;
-  return reg;
+  if(!reg){
+    await navigator.serviceWorker.ready;
+    reg=await navigator.serviceWorker.getRegistration('/class-lunch/');
+  }
+  return reg||null;
 }
 async function getCurrentPushSubscription(){
   try{
