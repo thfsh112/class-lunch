@@ -2,7 +2,7 @@ let latestOverviewCopyText='';
 const{createClient}=supabase;
 const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'class-lunch-admin-auth'}});
 const legacyDb=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:false,detectSessionInUrl:false}});
-let legacyAdminChecked=false,adminGatePassed=false;
+let legacyAdminChecked=false,adminGatePassed=localStorage.getItem('class-lunch-admin-gate')==='1';
 const $=id=>document.getElementById(id),money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -42,11 +42,13 @@ $('loginForm').addEventListener('submit',async e=>{
   }
 
   adminGatePassed=true;
+  localStorage.setItem('class-lunch-admin-gate','1');
   $('password').value='';
   await refresh();
 });
 $('logoutBtn').addEventListener('click',async()=>{
   adminGatePassed=false;
+  localStorage.removeItem('class-lunch-admin-gate');
   localStorage.setItem('class-lunch-admin-no-legacy-migrate','1');
   await db.auth.signOut();
   refresh();

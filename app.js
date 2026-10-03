@@ -282,7 +282,7 @@ $('setupForm').addEventListener('submit',async e=>{
   $('setupForm').reset();toast('設定完成');await refresh();
 });
 
-$('logoutBtn').addEventListener('click',async()=>{await detachPushBeforeLogout();await db.auth.signOut();student=null;refresh()});
+$('logoutBtn').addEventListener('click',async()=>{localStorage.removeItem('class-lunch-admin-gate');await detachPushBeforeLogout();await db.auth.signOut();student=null;refresh()});
 $('accountBtn').addEventListener('click',openAccountDialog);
 $('notifyBtn').addEventListener('click',openAccountDialog);
 $('enablePushBtn').addEventListener('click',enablePushNotifications);
