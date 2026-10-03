@@ -84,7 +84,6 @@ function refreshInstallStatus(){
   }
 }
 window.addEventListener('beforeinstallprompt',event=>{
-  event.preventDefault();
   deferredInstallPrompt=event;
   refreshInstallStatus();
 });
