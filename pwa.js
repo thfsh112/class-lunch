@@ -13,7 +13,7 @@
 
   window.addEventListener("load",async()=>{
     try{
-      const reg=await navigator.serviceWorker.register("/class-lunch/service-worker.js?v=20261003-14",{scope:"/class-lunch/",updateViaCache:"none"});
+      const reg=await navigator.serviceWorker.register("/class-lunch/service-worker.js?v=20261003-15",{scope:"/class-lunch/",updateViaCache:"none"});
       await reg.update().catch(()=>null);
     }catch(err){
       console.warn("Class Lunch service worker registration failed",err);
