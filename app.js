@@ -1,7 +1,7 @@
 const{createClient}=supabase;
 const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const $=id=>document.getElementById(id);
-let student=null,sessions=[],orders=[],menuItems=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,realtimeChannel=null,realtimeTimer=null;
+let student=null,sessions=[],orders=[],menuItems=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,realtimeChannel=null,realtimeTimer=null,deferredInstallPrompt=null;
 const money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
 const PUSH_VAPID_PUBLIC_KEY='BIfooHITgKhbwNm9ufy7fUdoyaU46cxxSFFoAOPQrKHJ4RPHzsqYQb9CEMWflB4PlXmpyptPHWl-fvgiWjeW_kE';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
@@ -46,6 +46,37 @@ async function getCurrentPushSubscription(){
     return reg?await reg.pushManager.getSubscription():null;
   }catch{return null}
 }
+function isStandalonePwa(){
+  return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+}
+function refreshInstallStatus(){
+  const box=$('installBox'),btn=$('installAppBtn'),text=$('installStatusText');
+  if(!box||!btn||!text)return;
+  if(isStandalonePwa()){
+    box.classList.add('hidden');
+    return;
+  }
+  box.classList.remove('hidden');
+  if(deferredInstallPrompt){
+    text.textContent='已符合 App 安裝條件，可直接安裝。';
+    btn.disabled=false;
+    btn.textContent='安裝 App';
+  }else{
+    text.textContent='Chrome 正在確認 App 安裝資格；請先在此頁停留並操作一下。';
+    btn.disabled=false;
+    btn.textContent='檢查並安裝';
+  }
+}
+window.addEventListener('beforeinstallprompt',event=>{
+  event.preventDefault();
+  deferredInstallPrompt=event;
+  refreshInstallStatus();
+});
+window.addEventListener('appinstalled',()=>{
+  deferredInstallPrompt=null;
+  refreshInstallStatus();
+  toast('班級訂飯已安裝');
+});
 async function upsertCurrentPushSubscription(subscription){
   if(!student||!subscription)return;
   const json=subscription.toJSON();
@@ -188,6 +219,18 @@ $('notifyBtn').addEventListener('click',openAccountDialog);
 $('enablePushBtn').addEventListener('click',enablePushNotifications);
 $('disablePushBtn').addEventListener('click',disablePushNotifications);
 $('historyBtn').addEventListener('click',openHistory);
+$('installAppBtn').addEventListener('click',async()=>{
+  if(isStandalonePwa())return toast('已經是 App 模式');
+  if(!deferredInstallPrompt){
+    refreshInstallStatus();
+    return toast('Chrome 尚未提供安裝；請在頁面停留約 30 秒後再按一次');
+  }
+  deferredInstallPrompt.prompt();
+  const choice=await deferredInstallPrompt.userChoice.catch(()=>null);
+  deferredInstallPrompt=null;
+  refreshInstallStatus();
+  if(choice?.outcome==='accepted')toast('正在安裝班級訂飯');
+});
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>$(b.dataset.close).close()));
 
 $('passwordForm').addEventListener('submit',async e=>{
@@ -420,4 +463,7 @@ function stopStudentRealtime(){
   if(realtimeChannel){db.removeChannel(realtimeChannel);realtimeChannel=null}
 }
 setInterval(()=>{if(student&&sessions.length)renderSessions()},30000);
-db.auth.onAuthStateChange(()=>setTimeout(refresh,0));refresh();
+db.auth.onAuthStateChange(()=>setTimeout(refresh,0));
+refreshInstallStatus();
+setTimeout(refreshInstallStatus,32000);
+refresh();
