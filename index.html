@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>班級訂飯 🍱</title>
-<link rel="icon" type="image/png" href="install-icon-192.png?v=20261003-13">
-<link rel="apple-touch-icon" href="install-icon-192.png?v=20261003-13">
+<link rel="icon" type="image/png" href="install-icon-192.png?v=20261003-14">
+<link rel="apple-touch-icon" href="install-icon-192.png?v=20261003-14">
 <meta name="theme-color" content="#f7e7c6">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="班級訂飯">
-<link rel="manifest" href="manifest.webmanifest?v=20261003-13">
-<link rel="stylesheet" href="style.css?v=20261003-13">
+<link rel="manifest" href="manifest.webmanifest?v=20261003-14">
+<link rel="stylesheet" href="style.css?v=20261003-14">
 </head>
 <body>
 <header class="top hero">
@@ -26,7 +26,7 @@
     </div>
     <div class="header-actions">
       <button id="historyBtn" class="hero-action hidden" type="button">歷史訂單</button>
-      <button id="accountBtn" class="hero-action hidden" type="button">帳號設定</button>
+      <button id="notifyBtn" class="hero-action hidden" type="button">🔔 通知</button><button id="accountBtn" class="hero-action hidden" type="button">帳號設定</button>
       <a id="adminLink" class="hero-action admin-link hidden" href="admin.html">管理</a>
       <button id="logoutBtn" class="hero-action subtle hidden" type="button">登出</button>
     </div>
@@ -97,7 +97,20 @@
 
 <dialog id="accountDialog" class="form-dialog">
   <form id="passwordForm">
-    <div class="dialog-head"><div><small>帳號設定</small><h2>修改密碼</h2></div><button type="button" class="close-dialog" data-close="accountDialog">×</button></div>
+    <div class="dialog-head"><div><small>帳號設定</small><h2>通知與密碼</h2></div><button type="button" class="close-dialog" data-close="accountDialog">×</button></div>
+    <section class="notification-settings">
+      <div>
+        <b>訂餐通知</b>
+        <p id="pushStatusText" class="hint">正在檢查通知狀態…</p>
+        <small class="hint">會通知「新日期開放訂餐」以及「截止前 1 小時」。截止提醒只會發給尚未訂餐的人。</small>
+      </div>
+      <div class="notification-actions">
+        <button id="enablePushBtn" class="primary" type="button">開啟通知</button>
+        <button id="disablePushBtn" class="ghost hidden" type="button">關閉通知</button>
+      </div>
+    </section>
+    <div class="account-divider"></div>
+    <h3 class="account-subtitle">修改密碼</h3>
     <p class="hint">座號與姓名不能自行修改；姓名如需更正請找管理員。</p>
     <label>新密碼<input id="newPassword" type="password" minlength="4" maxlength="64" required autocomplete="new-password" placeholder="至少 4 碼"></label>
     <label>再次輸入<input id="newPassword2" type="password" minlength="4" maxlength="64" required autocomplete="new-password"></label>
@@ -109,6 +122,6 @@
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.APP_CONFIG={supabaseUrl:"https://roynzxilxumfzzuezelg.supabase.co",publishableKey:"sb_publishable_nvmHzVjH7bZ8F9cnJYzKCg_PSPlhCXU"};</script>
-<script src="pwa.js?v=20261003-13"></script>
-<script src="app.js?v=20261003-13"></script>
+<script src="pwa.js?v=20261003-14"></script>
+<script src="app.js?v=20261003-14"></script>
 </body></html>
