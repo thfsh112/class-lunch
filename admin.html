@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="zh-Hant">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>訂飯管理</title><link rel="icon" type="image/png" sizes="180x180" href="icon-192.png?v=20261003-33"><link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?v=20261003-33"><meta name="theme-color" content="#f7e7c6"><link rel="manifest" href="manifest.webmanifest?v=20261003-33"><link rel="stylesheet" href="style.css?v=20261003-33"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>訂飯管理</title><link rel="icon" type="image/png" sizes="180x180" href="icon-192.png?v=20261003-34"><link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?v=20261003-34"><meta name="theme-color" content="#f7e7c6"><link rel="manifest" href="manifest.webmanifest?v=20261003-34"><link rel="stylesheet" href="style.css?v=20261003-34"></head>
 <body>
 <header class="top"><div><div class="eyebrow">ADMIN</div><h1>訂飯管理</h1><p id="loginStatus">請先在首頁登入 99 號，再進入管理頁。</p></div><a class="admin-link" href="index.html">回首頁</a></header>
 <main>
-<section id="loginBox" class="panel login-panel"><h2>管理者驗證</h2><p class="hint">請先在首頁登入 99 號，再進入管理頁。</p><form id="loginForm"><button class="primary" type="submit">使用 99 號身分進入管理</button></form></section>
+<section id="loginBox" class="panel login-panel"><h2>管理者登入</h2><p class="hint">請先在首頁登入 99 號，再輸入管理帳號密碼。</p><form id="loginForm"><label>帳號<input id="adminUsername" type="text" required autocomplete="username" placeholder="tnfsh112"></label><label>密碼<input id="password" type="password" required autocomplete="current-password"></label><button class="primary" type="submit">進入管理</button></form></section>
 <div id="adminApp" class="hidden">
   <div class="admin-tabs">
     <button class="tab active" data-tab="overview">訂單總覽</button>
@@ -94,6 +94,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>window.APP_CONFIG={supabaseUrl:"https://roynzxilxumfzzuezelg.supabase.co",publishableKey:"sb_publishable_nvmHzVjH7bZ8F9cnJYzKCg_PSPlhCXU"};</script>
-<script src="pwa.js?v=20261003-33"></script>
-<script src="admin.js?v=20261003-33"></script>
+<script src="pwa.js?v=20261003-34"></script>
+<script src="admin.js?v=20261003-34"></script>
 </body></html>

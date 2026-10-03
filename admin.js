@@ -2,7 +2,7 @@ let latestOverviewCopyText='';
 const{createClient}=supabase;
 const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'class-lunch-admin-auth'}});
 const legacyDb=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:false,detectSessionInUrl:false}});
-let legacyAdminChecked=false;
+let legacyAdminChecked=false,adminGatePassed=false;
 const $=id=>document.getElementById(id),money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -17,6 +17,7 @@ function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');set
 async function isAdmin(){const{data:{user}}=await db.auth.getUser();if(!user)return false;const{data}=await db.from('admin_users').select('email').eq('email',user.email).maybeSingle();return!!data}
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
+  const username=$('adminUsername').value.trim(),password=$('password').value;
 
   const{data:{session}}=await legacyDb.auth.getSession();
   if(!session)return toast('請先回首頁登入 99 號，再進管理頁');
@@ -34,9 +35,18 @@ $('loginForm').addEventListener('submit',async e=>{
   });
   if(setError)return toast('管理登入失敗：'+setError.message);
 
+  const{data,error}=await db.functions.invoke('class-lunch-admin-login',{body:{username,password}});
+  if(error||data?.error){
+    adminGatePassed=false;
+    return toast('管理帳號或密碼錯誤');
+  }
+
+  adminGatePassed=true;
+  $('password').value='';
   await refresh();
 });
 $('logoutBtn').addEventListener('click',async()=>{
+  adminGatePassed=false;
   localStorage.setItem('class-lunch-admin-no-legacy-migrate','1');
   await db.auth.signOut();
   refresh();
@@ -59,7 +69,11 @@ async function migrateLegacyAdminSession(){
 }
 async function refresh(){
   await migrateLegacyAdminSession();
-  const ok=await isAdmin();$('loginBox').classList.toggle('hidden',ok);$('adminApp').classList.toggle('hidden',!ok);$('loginStatus').textContent=ok?'已登入管理者':'登入後管理菜單、日期、學生與付款。';
+  const adminIdentity=await isAdmin();
+  const ok=adminIdentity&&adminGatePassed;
+  $('loginBox').classList.toggle('hidden',ok);
+  $('adminApp').classList.toggle('hidden',!ok);
+  $('loginStatus').textContent=ok?'已登入管理者':adminIdentity?'99 號已登入，請輸入管理帳密。':'請先在首頁登入 99 號。';
   if(!ok){stopAdminRealtime();return}
   startAdminRealtime();
   $('sessionDate').value=today();
