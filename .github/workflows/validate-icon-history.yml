@@ -1,0 +1,42 @@
+name: Validate historical PWA icons
+
+on:
+  push:
+    paths:
+      - ".github/workflows/validate-icon-history.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: python -m pip install --quiet pillow
+      - name: Validate candidates
+        run: |
+          python - <<'PY'
+          import subprocess, io
+          from PIL import Image, ImageStat
+
+          candidates = [
+            ("6a54fbf0171ef84e1466d5534cab4a746c00bd78", "install-icon-192.png"),
+            ("6a54fbf0171ef84e1466d5534cab4a746c00bd78", "install-icon-512.png"),
+            ("67cc889d129635ee2bbf003ecb1cebcb1bddf802", "install-icon-512.png"),
+            ("3503179c6e7ee015b6bee949506a91cd9844bc58", "install-icon-192.png"),
+            ("3503179c6e7ee015b6bee949506a91cd9844bc58", "install-icon-512.png"),
+          ]
+
+          for sha, path in candidates:
+              label = f"{sha[:8]}:{path}"
+              try:
+                  data = subprocess.check_output(["git","show",f"{sha}:{path}"])
+                  with Image.open(io.BytesIO(data)) as im:
+                      im.load()
+                      rgb = im.convert("RGB")
+                      st = ImageStat.Stat(rgb)
+                      print("OK", label, "bytes", len(data), "size", im.size, "mode", im.mode,
+                            "extrema", rgb.getextrema(), "mean", [round(x,1) for x in st.mean])
+              except Exception as e:
+                  print("BAD", label, type(e).__name__, str(e))
+          PY
