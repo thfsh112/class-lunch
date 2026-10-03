@@ -5,3 +5,12 @@
 
 .market-btn{border-color:#e7c584;background:#fff9ec;color:#9a6412}.market-price-row{display:grid;grid-template-columns:1fr minmax(140px,190px);gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid #eee1dc}.market-price-row span,.market-price-row small{display:block}.market-price-row small{margin-top:3px;color:#927d74;font-weight:500}.market-price-row input{margin:0}.market-total-preview{margin-top:16px;padding:13px 14px;border:1px solid #ecd6ad;border-radius:14px;background:#fff8e9}.market-total-preview b{font-size:18px}
 @media(max-width:560px){.market-price-row{grid-template-columns:1fr}.market-price-row input{width:100%}}
+
+.notification-settings{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:16px;border:1px solid #eadbc7;border-radius:18px;background:#fff8ee;margin:10px 0 18px}
+.notification-settings b{display:block;font-size:17px;margin-bottom:4px}
+.notification-settings .hint{margin:4px 0;line-height:1.55}
+.notification-actions{display:flex;flex-direction:column;gap:8px;min-width:108px}
+.notification-actions button{white-space:nowrap}
+.account-divider{height:1px;background:#eee1d2;margin:18px 0}
+.account-subtitle{margin:0 0 8px}
+@media(max-width:560px){.notification-settings{flex-direction:column}.notification-actions{width:100%;flex-direction:row}.notification-actions button{flex:1}}
