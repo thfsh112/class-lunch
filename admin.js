@@ -6,7 +6,13 @@ let legacyAdminChecked=false;
 const $=id=>document.getElementById(id),money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-let templates=[],sessions=[],students=[],editingTemplateId=null,editingSessionId=null,editingStudentId=null,menuEditorItems=[],originalMenuItemIds=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null;
+const defaultCutoffForDate=date=>date?date+'T10:00':'';
+function applyDefaultSessionCutoff(force=false){
+  const date=$('sessionDate')?.value,cutoff=$('sessionCutoff');
+  if(!date||!cutoff)return;
+  if(force||!cutoff.value)cutoff.value=defaultCutoffForDate(date);
+}
+let templates=[],sessions=[],students=[],editingTemplateId=null,editingSessionId=null,editingSessionOriginalDate='',editingStudentId=null,menuEditorItems=[],originalMenuItemIds=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null;
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
 async function isAdmin(){const{data:{user}}=await db.auth.getUser();if(!user)return false;const{data}=await db.from('admin_users').select('email').eq('email',user.email).maybeSingle();return!!data}
 $('loginForm').addEventListener('submit',async e=>{
@@ -57,6 +63,7 @@ async function refresh(){
   if(!ok){stopAdminRealtime();return}
   startAdminRealtime();
   $('sessionDate').value=today();
+  applyDefaultSessionCutoff(true);
   await Promise.all([loadTemplates(),loadSessions(),loadStudents()]);
   renderTemplateSelect();renderSessionList();renderStudentList();renderOverviewSelect();renderInitStatus();
 }
@@ -279,13 +286,28 @@ $('templateEditForm').addEventListener('submit',async e=>{
   $('templateDialog').close();toast('菜單與品項已更新');await loadTemplates();renderTemplateSelect();await loadSessions();
 });
 
+$('sessionDate').addEventListener('change',()=>applyDefaultSessionCutoff(true));
+
+$('editSessionDate').addEventListener('change',()=>{
+  const newDate=$('editSessionDate').value,cutoff=$('editSessionCutoff');
+  if(!newDate||!cutoff)return;
+  const current=cutoff.value;
+  if(!current){
+    cutoff.value=defaultCutoffForDate(newDate);
+  }else if(!editingSessionOriginalDate||current.startsWith(editingSessionOriginalDate+'T')){
+    const time=current.slice(11)||'10:00';
+    cutoff.value=newDate+'T'+time;
+  }
+  editingSessionOriginalDate=newDate;
+});
+
 $('sessionForm').addEventListener('submit',async e=>{
   e.preventDefault();const cutoff=$('sessionCutoff').value;
   const{error}=await db.from('meal_sessions').insert({menu_template_id:Number($('sessionTemplate').value),meal_date:$('sessionDate').value,cutoff_at:cutoff?new Date(cutoff+':00+08:00').toISOString():null,is_active:$('sessionActive').checked});
-  if(error)return toast(error.message);toast('訂餐日期已新增');$('sessionCutoff').value='';await loadSessions();
+  if(error)return toast(error.message);toast('訂餐日期已新增');applyDefaultSessionCutoff(true);await loadSessions();
 });
 function localDatetime(v){if(!v)return'';const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(v));const m=Object.fromEntries(parts.map(x=>[x.type,x.value]));return m.year+'-'+m.month+'-'+m.day+'T'+m.hour+':'+m.minute}
-function openSessionDialog(id){const s=sessions.find(x=>x.id===id);if(!s)return;editingSessionId=id;$('editSessionTemplate').value=String(s.menu_template_id);$('editSessionDate').value=s.meal_date;$('editSessionCutoff').value=localDatetime(s.cutoff_at);$('editSessionActive').checked=s.is_active;$('sessionDialog').showModal()}
+function openSessionDialog(id){const s=sessions.find(x=>x.id===id);if(!s)return;editingSessionId=id;editingSessionOriginalDate=s.meal_date;$('editSessionTemplate').value=String(s.menu_template_id);$('editSessionDate').value=s.meal_date;$('editSessionCutoff').value=localDatetime(s.cutoff_at)||defaultCutoffForDate(s.meal_date);$('editSessionActive').checked=s.is_active;$('sessionDialog').showModal()}
 $('sessionEditForm').addEventListener('submit',async e=>{
   e.preventDefault();const cutoff=$('editSessionCutoff').value;
   const{error}=await db.from('meal_sessions').update({menu_template_id:Number($('editSessionTemplate').value),meal_date:$('editSessionDate').value,cutoff_at:cutoff?new Date(cutoff+':00+08:00').toISOString():null,is_active:$('editSessionActive').checked,updated_at:new Date().toISOString()}).eq('id',editingSessionId);
