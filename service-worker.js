@@ -1,17 +1,17 @@
-const STATIC_CACHE="class-lunch-static-v20261003-13";
+const STATIC_CACHE="class-lunch-static-v20261003-14";
 const IMAGE_CACHE="class-lunch-menu-images-v1";
 
 const APP_SHELL=[
   "./index.html",
   "./admin.html",
-  "./style.css?v=20261003-13",
-  "./app.js?v=20261003-13",
-  "./admin.js?v=20261003-13",
-  "./pwa.js?v=20261003-13",
-  "./manifest.webmanifest?v=20261003-13",
-  "./install-icon-192.png?v=20261003-13",
-  "./install-icon-512.png?v=20261003-13",
-  "./icon-512.svg?v=20261003-13"
+  "./style.css?v=20261003-14",
+  "./app.js?v=20261003-14",
+  "./admin.js?v=20261003-14",
+  "./pwa.js?v=20261003-14",
+  "./manifest.webmanifest?v=20261003-14",
+  "./install-icon-192.png?v=20261003-14",
+  "./install-icon-512.png?v=20261003-14",
+  "./icon-512.svg?v=20261003-14"
 ];
 
 self.addEventListener("install",event=>{
@@ -92,5 +92,45 @@ self.addEventListener("fetch",event=>{
       }
       return response;
     }).catch(()=>caches.match(event.request))
+  );
+});
+
+
+self.addEventListener("push",event=>{
+  let payload={
+    title:"班級訂飯",
+    body:"訂餐有新通知",
+    tag:"class-lunch-notice",
+    data:{url:"https://thfsh112.github.io/class-lunch/"}
+  };
+  if(event.data){
+    try{payload={...payload,...event.data.json()}}
+    catch{try{payload.body=event.data.text()||payload.body}catch{}}
+  }
+  event.waitUntil(
+    self.registration.showNotification(payload.title||"班級訂飯",{
+      body:payload.body||"訂餐有新通知",
+      icon:"./install-icon-192.png?v=20261003-14",
+      badge:"./install-icon-192.png?v=20261003-14",
+      tag:payload.tag||"class-lunch-notice",
+      renotify:true,
+      data:payload.data||{url:"https://thfsh112.github.io/class-lunch/"}
+    })
+  );
+});
+
+self.addEventListener("notificationclick",event=>{
+  event.notification.close();
+  const target=event.notification.data?.url||"https://thfsh112.github.io/class-lunch/";
+  event.waitUntil(
+    clients.matchAll({type:"window",includeUncontrolled:true}).then(list=>{
+      for(const client of list){
+        if("focus" in client){
+          client.navigate(target).catch(()=>null);
+          return client.focus();
+        }
+      }
+      return clients.openWindow(target);
+    })
   );
 });
