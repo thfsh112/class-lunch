@@ -30,11 +30,12 @@ function urlBase64ToUint8Array(base64String){
 }
 async function getPushRegistration(){
   if(!('serviceWorker' in navigator))return null;
-  const scopeUrl=new URL('/class-lunch/',location.origin).href;
+  const scopeUrl=new URL('./',location.href).href;
+  const workerUrl=new URL('./service-worker.js',location.href).href;
   const regs=await navigator.serviceWorker.getRegistrations();
-  let reg=regs.find(r=>r.scope===scopeUrl||r.active?.scriptURL?.includes('/class-lunch/service-worker.js'));
+  let reg=regs.find(r=>r.scope===scopeUrl||r.active?.scriptURL?.split('?')[0]===workerUrl);
   if(!reg){
-    reg=await navigator.serviceWorker.register('/class-lunch/service-worker.js?v=20261003-15',{scope:'/class-lunch/',updateViaCache:'none'});
+    reg=await navigator.serviceWorker.register('./service-worker.js',{scope:'./',updateViaCache:'none'});
   }
   await reg.update().catch(()=>null);
   if(!reg.active)reg=await navigator.serviceWorker.ready;
