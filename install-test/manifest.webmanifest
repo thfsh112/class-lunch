@@ -1,0 +1,23 @@
+{
+  "name": "班級訂飯 PWA 測試",
+  "short_name": "PWA 測試",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fff8f2",
+  "theme_color": "#f7e7c6",
+  "icons": [
+    {
+      "src": "../install-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../install-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
