@@ -14,3 +14,5 @@
 .account-divider{height:1px;background:#eee1d2;margin:18px 0}
 .account-subtitle{margin:0 0 8px}
 @media(max-width:560px){.notification-settings{flex-direction:column}.notification-actions{width:100%;flex-direction:row}.notification-actions button{flex:1}}
+
+.pwa-install-panel{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:-22px}.pwa-install-panel h3{margin:0 0 4px}.pwa-install-panel p{margin:0}.pwa-install-panel .primary{white-space:nowrap}@media(max-width:520px){.pwa-install-panel{align-items:stretch;flex-direction:column}.pwa-install-panel .primary{width:100%}}
