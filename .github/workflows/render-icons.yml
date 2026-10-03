@@ -1,10 +1,8 @@
-name: Render clean PWA icons
+name: Rebuild PWA icons from original source
 
 on:
   push:
     paths:
-      - "icon-source-192.svg"
-      - "icon-source-512.svg"
       - ".github/workflows/render-icons.yml"
 
 permissions:
@@ -15,47 +13,49 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Install render tools
-        run: python -m pip install --quiet cairosvg pillow
+      - name: Install Pillow
+        run: python -m pip install --quiet pillow
 
-      - name: Render and validate icons
+      - name: Extract original icon source
+        run: git show 3503179c6e7ee015b6bee949506a91cd9844bc58:icon.png > /tmp/icon-source.png
+
+      - name: Rebuild and validate PWA icons
         run: |
           python - <<'PY'
-          import io, math
-          import cairosvg
           from PIL import Image, ImageStat
 
-          jobs = [
-              ("icon-source-192.svg", "icon-192.png", 192),
-              ("icon-source-512.svg", "icon-512.png", 512),
-          ]
+          src = Image.open("/tmp/icon-source.png")
+          src.load()
+          print("source", src.size, src.mode, src.getextrema())
 
-          for src, out, size in jobs:
-              png = cairosvg.svg2png(url=src, output_width=size, output_height=size)
-              im = Image.open(io.BytesIO(png)).convert("RGB")
-              if im.size != (size, size):
-                  raise SystemExit(f"{out}: wrong size {im.size}")
-              stat = ImageStat.Stat(im)
-              extrema = im.getextrema()
-              # reject blank / near-uniform output
-              spread = sum(hi - lo for lo, hi in extrema)
-              if spread < 60:
-                  raise SystemExit(f"{out}: image looks blank/uniform, extrema={extrema}")
-              im.save(out, "PNG", optimize=True)
-              # Re-open without tolerant mode to verify a clean file.
-              with Image.open(out) as check:
+          rgb = src.convert("RGB")
+          spread = sum(hi - lo for lo, hi in rgb.getextrema())
+          if spread < 60:
+              raise SystemExit("original icon source looks blank/uniform")
+
+          for size in (192, 512):
+              out = rgb.resize((size, size), Image.Resampling.LANCZOS)
+              path = f"icon-{size}.png"
+              out.save(path, "PNG", optimize=True)
+
+              with Image.open(path) as check:
                   check.load()
-                  if check.size != (size, size) or check.mode != "RGB":
-                      raise SystemExit(f"{out}: validation failed {check.size} {check.mode}")
-              print(out, im.size, im.mode, extrema, [round(x,1) for x in stat.mean])
+                  stat = ImageStat.Stat(check)
+                  extrema = check.getextrema()
+                  spread = sum(hi - lo for lo, hi in extrema)
+                  if check.size != (size, size) or check.mode != "RGB" or spread < 60:
+                      raise SystemExit(f"{path}: validation failed {check.size} {check.mode} {extrema}")
+                  print(path, check.size, check.mode, extrema, [round(x,1) for x in stat.mean])
           PY
 
-      - name: Commit rendered icons
+      - name: Commit rebuilt icons
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add icon-192.png icon-512.png
           git diff --cached --quiet && exit 0
-          git commit -m "Render clean PWA icons from SVG sources"
+          git commit -m "Rebuild PWA icons from original source image"
           git push
