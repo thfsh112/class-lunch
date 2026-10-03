@@ -635,10 +635,10 @@ $('refreshBackupsBtn')?.addEventListener('click',loadBackups);
 $('createBackupBtn')?.addEventListener('click',async()=>{
   const date=$('backupDate').value||today(),btn=$('createBackupBtn');
   btn.disabled=true;btn.textContent='備份中…';
-  const{data,error}=await db.rpc('create_class_lunch_backup',{p_meal_date:date});
+  const{data,error}=await db.functions.invoke('class-lunch-backup',{body:{meal_date:date}});
   btn.disabled=false;btn.textContent='立即備份';
-  if(error)return toast('備份失敗：'+error.message);
-  toast('已建立 '+date+' 的備份 #'+data);
+  if(error||data?.error)return toast('備份失敗：'+(data?.detail||data?.error||error.message));
+  toast('已建立 '+date+' 的備份 #'+data.backup_id);
   await loadBackups();
 });
 async function downloadBackup(id){
