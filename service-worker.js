@@ -1,4 +1,4 @@
-const STATIC_CACHE="class-lunch-static-v20261003-27";
+const STATIC_CACHE="class-lunch-static-v20261003-28";
 const IMAGE_CACHE="class-lunch-menu-images-v1";
 
 const APP_SHELL=[
@@ -8,7 +8,7 @@ const APP_SHELL=[
   "./style.css?v=20261003-27",
   "./app.js?v=20261003-27",
   "./admin.js?v=20261003-20",
-  "./pwa.js?v=20261003-27",
+  "./pwa.js?v=20261003-28",
   "./manifest.webmanifest?v=20261003-27",
   "./icon-192.png?v=20261003-27",
   "./icon-512.png?v=20261003-27"
@@ -110,8 +110,8 @@ self.addEventListener("push",event=>{
   event.waitUntil(
     self.registration.showNotification(payload.title||"班級訂飯",{
       body:payload.body||"訂餐有新通知",
-      icon:"./icon-192.png?v=20261003-27",
-      badge:"./icon-192.png?v=20261003-27",
+      icon:"./notification-icon.png?v=20261003-28",
+      badge:"./notification-badge.png?v=20261003-28",
       tag:payload.tag||"class-lunch-notice",
       renotify:true,
       data:payload.data||{url:"https://thfsh112.github.io/class-lunch/"}
