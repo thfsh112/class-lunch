@@ -11,7 +11,9 @@ const APP_SHELL=[
   "./pwa.js?v=20261003-28",
   "./manifest.webmanifest?v=20261003-27",
   "./icon-192.png?v=20261003-27",
-  "./icon-512.png?v=20261003-27"
+  "./icon-512.png?v=20261003-27",
+  "./notification-icon.png?v=20261003-28",
+  "./notification-badge.png?v=20261003-28"
 ];
 
 self.addEventListener("install",event=>{
