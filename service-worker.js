@@ -1,15 +1,15 @@
-const STATIC_CACHE="class-lunch-static-v20261003-22";
+const STATIC_CACHE="class-lunch-static-v20261003-23";
 const IMAGE_CACHE="class-lunch-menu-images-v1";
 
 const APP_SHELL=[
   "./",
   "./index.html",
   "./admin.html",
-  "./style.css?v=20261003-22",
-  "./app.js?v=20261003-22",
+  "./style.css?v=20261003-23",
+  "./app.js?v=20261003-23",
   "./admin.js?v=20261003-20",
-  "./pwa.js?v=20261003-22",
-  "./manifest.webmanifest?v=20261003-22",
+  "./pwa.js?v=20261003-23",
+  "./manifest.webmanifest?v=20261003-23",
   "./install-icon-192.png?v=20261003-22",
   "./install-icon-512.png?v=20261003-22"
 ];
