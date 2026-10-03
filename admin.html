@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>訂飯管理</title><link rel="icon" type="image/png" sizes="180x180" href="install-icon-192.png?v=20261003-02"><link rel="apple-touch-icon" sizes="180x180" href="install-icon-192.png?v=20261003-02"><meta name="theme-color" content="#f7e7c6"><link rel="manifest" href="manifest.webmanifest?v=20261003-04"><link rel="stylesheet" href="style.css?v=20261003-03"></head>
+<body>
+<header class="top"><div><div class="eyebrow">ADMIN</div><h1>訂飯管理</h1><p id="loginStatus">請先在首頁登入 99 號，再使用管理帳號登入。</p></div><a class="admin-link" href="index.html">回首頁</a></header>
+<main>
+<section id="loginBox" class="panel login-panel"><h2>管理者登入</h2><form id="loginForm"><label>帳號<input id="adminUsername" type="text" required autocomplete="username" placeholder="tnfsh112"></label><label>密碼<input id="password" type="password" required></label><button class="primary" type="submit">登入</button></form></section>
+<div id="adminApp" class="hidden">
+  <div class="admin-tabs">
+    <button class="tab active" data-tab="overview">訂單總覽</button>
+    <button class="tab" data-tab="sessions">訂餐日期</button>
+    <button class="tab" data-tab="templates">菜單庫</button>
+    <button class="tab" data-tab="students">學生管理</button>
+    <button class="tab" data-tab="logs">操作紀錄</button>
+    <button class="tab ghost" id="adminAccountBtn" type="button">帳號設定</button>
+    <button class="tab ghost" id="logoutBtn">登出</button>
+  </div>
+
+  <section id="tab-overview" class="tab-page"><div class="panel"><div class="section-head"><h2>訂單總覽</h2><select id="overviewSession"></select></div><div class="stats"><div class="stat"><small>已訂</small><b id="statOrders">0</b></div><div class="stat"><small>已付款</small><b id="statPaid">0</b></div><div class="stat"><small>未付款</small><b id="statUnpaidCount">0</b></div><div class="stat"><small>總金額</small><b id="statTotal">$0</b></div></div><div id="itemStats" class="item-stats"></div><div id="seatPayments"></div></div></section>
+
+  <section id="tab-sessions" class="tab-page hidden">
+    <div class="panel"><h2>新增訂餐日期</h2><form id="sessionForm" class="admin-form-grid"><label>菜單<select id="sessionTemplate" required></select></label><label>供餐日期<input id="sessionDate" type="date" required></label><label>截止時間<input id="sessionCutoff" type="datetime-local"></label><label class="check-row"><input id="sessionActive" type="checkbox" checked> 開放</label><button class="primary" type="submit">新增日期</button></form></div>
+    <div class="panel"><div class="section-head"><h2>日期列表</h2><span id="sessionCount"></span></div><div id="sessionList"></div></div>
+  </section>
+
+  <section id="tab-templates" class="tab-page hidden">
+    <div class="panel"><h2>新增菜單</h2><form id="templateForm" class="admin-form-grid"><label>菜單名稱<input id="templateName" required placeholder="例如：鬍鬚張"></label><label>菜單圖片<input id="templateImage" type="file" accept="image/*" required></label><button class="primary" type="submit">存入菜單庫</button></form></div>
+    <div class="panel"><div class="section-head"><h2>菜單庫</h2><span id="templateCount"></span></div><div id="templateList"></div></div>
+  </section>
+
+  <section id="tab-students" class="tab-page hidden">
+    <div class="panel">
+      <div class="section-head"><div><h2>學生名單</h2><p class="hint">學生帳號只需初始化一次，不會再於後台登入時自動執行。</p></div><span id="studentCount"></span></div>
+      <div class="init-bar"><span id="initStatus">檢查帳號中…</span><button id="initStudentsBtn" class="primary" type="button">初始化學生帳號</button></div>
+      <div id="studentList"></div>
+    </div>
+  </section>
+
+  <section id="tab-logs" class="tab-page hidden">
+    <div class="panel"><div class="section-head"><h2>操作紀錄</h2><button id="refreshLogsBtn" class="small-btn">重新整理</button></div><div id="auditList"></div></div>
+  </section>
+</div>
+</main>
+
+<dialog id="adminAccountDialog" class="form-dialog">
+  <form id="adminAccountForm">
+    <div class="dialog-head"><div><small>管理員帳號</small><h2>修改管理密碼</h2></div><button type="button" class="close-dialog" data-close="adminAccountDialog">×</button></div>
+    <p class="hint">登入帳號固定為 <b>tnfsh112</b>。新密碼只會送到 Supabase Auth，不會寫進網站程式碼。</p>
+    <label>新密碼<input id="adminNewPassword" type="password" minlength="6" maxlength="64" required autocomplete="new-password"></label>
+    <label>再次輸入<input id="adminNewPassword2" type="password" minlength="6" maxlength="64" required autocomplete="new-password"></label>
+    <div class="dialog-actions"><button type="button" class="ghost" data-close="adminAccountDialog">取消</button><button class="primary" type="submit">更新密碼</button></div>
+  </form>
+</dialog>
+
+<dialog id="templateDialog" class="form-dialog">
+  <form id="templateEditForm">
+    <div class="dialog-head"><h2>編輯菜單</h2><button type="button" class="close-dialog" data-close="templateDialog">×</button></div>
+    <label>菜單名稱<input id="editTemplateName" maxlength="100" required></label>
+    <label>更換圖片（不更換可留空）<input id="editTemplateImage" type="file" accept="image/*"></label>
+    <label class="check-row"><input id="editTemplateActive" type="checkbox"> 啟用此菜單</label>
+    <div class="ocr-box">
+      <div class="section-head"><div><h3>菜單品項</h3><p class="hint">可由菜單圖片 OCR 辨識後再手動校正。</p></div><button id="ocrMenuBtn" type="button" class="small-btn">辨識菜單</button></div>
+      <div id="ocrProgress" class="hint"></div>
+      <textarea id="ocrRawText" rows="5" placeholder="OCR 原始文字會顯示在這裡"></textarea>
+      <div class="item-editor-head"><b>品項清單</b><button id="addMenuItemRowBtn" type="button" class="small-btn">＋新增品項</button></div>
+      <div id="menuItemEditor"></div>
+    </div>
+    <div class="dialog-actions"><button type="button" class="ghost" data-close="templateDialog">取消</button><button class="primary" type="submit">儲存菜單與品項</button></div>
+  </form>
+</dialog>
+
+<dialog id="sessionDialog" class="form-dialog">
+  <form id="sessionEditForm">
+    <div class="dialog-head"><h2>編輯訂餐日期</h2><button type="button" class="close-dialog" data-close="sessionDialog">×</button></div>
+    <label>菜單<select id="editSessionTemplate" required></select></label>
+    <label>供餐日期<input id="editSessionDate" type="date" required></label>
+    <label>截止時間<input id="editSessionCutoff" type="datetime-local"></label>
+    <label class="check-row"><input id="editSessionActive" type="checkbox"> 開放</label>
+    <div class="dialog-actions spread"><button id="deleteSessionBtn" type="button" class="small-btn danger">刪除此日期</button><div><button type="button" class="ghost" data-close="sessionDialog">取消</button> <button class="primary" type="submit">儲存</button></div></div>
+  </form>
+</dialog>
+
+<dialog id="marketPriceDialog" class="form-dialog">
+  <form id="marketPriceForm">
+    <div class="dialog-head"><div><small id="marketPriceSeat"></small><h2>設定時價</h2></div><button type="button" class="close-dialog" data-close="marketPriceDialog">×</button></div>
+    <p class="hint">只調整這位學生這張訂單的時價，不會修改菜單原本設定。</p>
+    <div id="marketPriceRows"></div>
+    <div class="market-total-preview">調整後訂單金額：<b id="marketPricePreview">$0</b></div>
+    <div class="dialog-actions"><button type="button" class="ghost" data-close="marketPriceDialog">取消</button><button class="primary" type="submit">儲存時價</button></div>
+  </form>
+</dialog>
+
+<dialog id="studentDialog" class="form-dialog">
+  <form id="studentEditForm">
+    <div class="dialog-head"><div><small id="editStudentSeat"></small><h2>編輯學生</h2></div><button type="button" class="close-dialog" data-close="studentDialog">×</button></div>
+    <label>姓名<input id="editStudentName" maxlength="50"></label>
+    <label class="check-row"><input id="editStudentActive" type="checkbox"> 啟用帳號</label>
+    <label>重設密碼（不重設可留空）<input id="editStudentPassword" type="password" placeholder="至少 4 碼"></label>
+    <div class="dialog-actions"><button type="button" class="ghost" data-close="studentDialog">取消</button><button class="primary" type="submit">儲存</button></div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>window.APP_CONFIG={supabaseUrl:"https://roynzxilxumfzzuezelg.supabase.co",publishableKey:"sb_publishable_nvmHzVjH7bZ8F9cnJYzKCg_PSPlhCXU"};</script>
+<script src="pwa.js?v=20261003-03"></script>
+<script src="admin.js?v=20261003-08"></script>
+</body></html>
