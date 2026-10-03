@@ -2,18 +2,15 @@ let latestOverviewCopyText='';
 const{createClient}=supabase;
 const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'class-lunch-admin-auth'}});
 const legacyDb=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:false,detectSessionInUrl:false}});
-const ADMIN_USERNAME='tnfsh112';
 let legacyAdminChecked=false;
 const $=id=>document.getElementById(id),money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-const today=()=>new Date().toLocaleDateString('en-CA');
-let templates=[],sessions=[],students=[],editingTemplateId=null,editingSessionId=null,editingStudentId=null,menuEditorItems=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null;
+const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+let templates=[],sessions=[],students=[],editingTemplateId=null,editingSessionId=null,editingStudentId=null,menuEditorItems=[],originalMenuItemIds=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null;
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
 async function isAdmin(){const{data:{user}}=await db.auth.getUser();if(!user)return false;const{data}=await db.from('admin_users').select('email').eq('email',user.email).maybeSingle();return!!data}
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
-  const username=$('adminUsername').value.trim(),password=$('password').value;
-  if(username!==ADMIN_USERNAME||password!==ADMIN_USERNAME)return toast('帳號或密碼錯誤');
 
   const{data:{session}}=await legacyDb.auth.getSession();
   if(!session)return toast('請先回首頁登入 99 號，再進管理頁');
@@ -31,7 +28,6 @@ $('loginForm').addEventListener('submit',async e=>{
   });
   if(setError)return toast('管理登入失敗：'+setError.message);
 
-  $('password').value='';
   await refresh();
 });
 $('logoutBtn').addEventListener('click',async()=>{
@@ -39,18 +35,7 @@ $('logoutBtn').addEventListener('click',async()=>{
   await db.auth.signOut();
   refresh();
 });
-$('adminAccountBtn').addEventListener('click',()=>toast('管理登入固定使用 tnfsh112 / tnfsh112'));
-$('adminAccountForm').addEventListener('submit',async e=>{
-  e.preventDefault();
-  const p1=$('adminNewPassword').value,p2=$('adminNewPassword2').value;
-  if(p1.length<6)return toast('管理密碼至少 6 碼');
-  if(p1!==p2)return toast('兩次密碼不一致');
-  const b=e.currentTarget.querySelector('button[type="submit"]');b.disabled=true;b.textContent='更新中…';
-  const{error}=await db.auth.updateUser({password:p1});
-  b.disabled=false;b.textContent='更新密碼';
-  if(error)return toast('密碼更新失敗：'+error.message);
-  $('adminAccountDialog').close();$('adminAccountForm').reset();toast('管理密碼已更新');
-});
+$('adminAccountBtn')?.addEventListener('click',()=>toast('99 號密碼固定為 099，不能修改'));
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>$(b.dataset.close).close()));
 document.querySelectorAll('.tab[data-tab]').forEach(b=>b.addEventListener('click',async()=>{document.querySelectorAll('.tab[data-tab]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.tab-page').forEach(p=>p.classList.add('hidden'));$('tab-'+b.dataset.tab).classList.remove('hidden');if(b.dataset.tab==='logs')await loadLogs()}));
 
@@ -84,7 +69,7 @@ function renderTemplateSelect(){
   $('editSessionTemplate').innerHTML=templates.map(t=>'<option value="'+t.id+'">'+esc(t.name)+(t.active?'':'（停用）')+'</option>').join('');
 }
 function renderTemplateList(){$('templateList').innerHTML=templates.map(t=>'<div class="admin-item">'+(t.image_url?'<img src="'+esc(t.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(t.name)+'</b><br><span class="hint">'+(t.active?'使用中':'已停用')+'</span></div><div class="actions"><button class="small-btn" onclick="openTemplateDialog('+t.id+')">編輯</button></div></div>').join('')||'<div class="loading">尚無菜單</div>'}
-function renderSessionList(){$('sessionList').innerHTML=sessions.map(s=>'<div class="admin-item">'+(s.menu_templates?.image_url?'<img src="'+esc(s.menu_templates.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(s.menu_templates?.name||'菜單')+'</b><br>'+esc(s.meal_date)+(s.cutoff_at?' · 截止 '+esc(new Date(s.cutoff_at).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):'')+'<br><span class="hint">'+(s.is_active?'開放':'關閉')+'</span></div><div class="actions"><button class="small-btn" onclick="openSessionDialog('+s.id+')">編輯</button></div></div>').join('')||'<div class="loading">尚無日期</div>'}
+function renderSessionList(){$('sessionList').innerHTML=sessions.map(s=>'<div class="admin-item">'+(s.menu_templates?.image_url?'<img src="'+esc(s.menu_templates.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(s.menu_templates?.name||'菜單')+'</b><br>'+esc(s.meal_date)+(s.cutoff_at?' · 截止 '+esc(new Date(s.cutoff_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):'')+'<br><span class="hint">'+(s.is_active?'開放':'關閉')+'</span></div><div class="actions"><button class="small-btn" onclick="openSessionDialog('+s.id+')">編輯</button></div></div>').join('')||'<div class="loading">尚無日期</div>'}
 function renderStudentList(){$('studentList').innerHTML=students.map(s=>'<div class="student-row"><span class="seat-badge">'+s.seat_number+'號</span><div><b>'+esc(s.name||'尚未設定姓名')+'</b><br><span class="hint">'+(s.auth_user_id?'帳號已建立':'尚未初始化')+' · '+(s.active?'啟用中':'已停用')+(s.must_setup?' · 待首次設定':'')+'</span></div><div class="actions"><button class="small-btn" onclick="openStudentDialog(\''+s.id+'\')">編輯</button></div></div>').join('')||'<div class="loading">尚無學生</div>'}
 function renderInitStatus(){if(!$('initStatus'))return;const linked=students.filter(s=>s.auth_user_id).length;$('initStatus').textContent='Auth 帳號 '+linked+' / '+students.length+' 已建立';$('initStudentsBtn').disabled=students.length>0&&linked===students.length;$('initStudentsBtn').textContent=linked===students.length?'學生帳號已完成':'初始化學生帳號'}
 
@@ -111,6 +96,7 @@ async function openTemplateDialog(id){
   const{data,error}=await db.from('menu_items').select('id,category,name,price,is_market_price,active,sort_order').eq('menu_template_id',id).order('sort_order').order('id');
   if(error)return toast('讀取品項失敗：'+error.message);
   menuEditorItems=(data||[]).map(x=>({...x}));
+  originalMenuItemIds=(data||[]).map(x=>x.id);
   renderMenuItemEditor();
   $('templateDialog').showModal();
 }
@@ -256,23 +242,53 @@ $('templateEditForm').addEventListener('submit',async e=>{
   const patch={name,active:$('editTemplateActive').checked,updated_at:new Date().toISOString()},f=$('editTemplateImage').files[0];
   if(f){if(f.size>6*1024*1024)return toast('圖片請小於 6MB');const url=await uploadMenuImage(f);if(!url)return;patch.image_url=url}
   const{error}=await db.from('menu_templates').update(patch).eq('id',editingTemplateId);if(error)return toast(error.message);
-  const cleaned=menuEditorItems.map((x,i)=>({menu_template_id:editingTemplateId,category:String(x.category||'').trim(),name:String(x.name||'').trim(),price:x.is_market_price?0:Number(x.price||0),is_market_price:!!x.is_market_price,active:x.active!==false,sort_order:i})).filter(x=>x.name);
+  const cleaned=menuEditorItems.map((x,i)=>({id:x.id||null,menu_template_id:editingTemplateId,category:String(x.category||'').trim(),name:String(x.name||'').trim(),price:x.is_market_price?0:Number(x.price||0),is_market_price:!!x.is_market_price,active:x.active!==false,sort_order:i})).filter(x=>x.name);
   if(cleaned.some(x=>!Number.isInteger(x.price)||x.price<0||x.price>10000))return toast('品項價格格式不正確');
-  const del=await db.from('menu_items').delete().eq('menu_template_id',editingTemplateId);if(del.error)return toast('品項更新失敗：'+del.error.message);
-  if(cleaned.length){const ins=await db.from('menu_items').insert(cleaned);if(ins.error)return toast('品項儲存失敗：'+ins.error.message)}
+
+  const keptIds=new Set(cleaned.filter(x=>x.id).map(x=>Number(x.id)));
+  const removedIds=originalMenuItemIds.filter(id=>!keptIds.has(Number(id)));
+
+  if(removedIds.length){
+    const{data:refs,error:refError}=await db.from('order_items').select('menu_item_id').in('menu_item_id',removedIds);
+    if(refError)return toast('檢查歷史訂單失敗：'+refError.message);
+    const referenced=new Set((refs||[]).map(x=>Number(x.menu_item_id)));
+    const archiveIds=removedIds.filter(id=>referenced.has(Number(id)));
+    const deleteIds=removedIds.filter(id=>!referenced.has(Number(id)));
+
+    if(archiveIds.length){
+      const r=await db.from('menu_items').update({active:false}).in('id',archiveIds);
+      if(r.error)return toast('停用歷史品項失敗：'+r.error.message);
+    }
+    if(deleteIds.length){
+      const r=await db.from('menu_items').delete().in('id',deleteIds);
+      if(r.error)return toast('刪除品項失敗：'+r.error.message);
+    }
+  }
+
+  for(const row of cleaned.filter(x=>x.id)){
+    const{id,...patch}=row;
+    const r=await db.from('menu_items').update(patch).eq('id',id).eq('menu_template_id',editingTemplateId);
+    if(r.error)return toast('品項更新失敗：'+r.error.message);
+  }
+
+  const newRows=cleaned.filter(x=>!x.id).map(({id,...row})=>row);
+  if(newRows.length){
+    const r=await db.from('menu_items').insert(newRows);
+    if(r.error)return toast('品項新增失敗：'+r.error.message);
+  }
   $('templateDialog').close();toast('菜單與品項已更新');await loadTemplates();renderTemplateSelect();await loadSessions();
 });
 
 $('sessionForm').addEventListener('submit',async e=>{
   e.preventDefault();const cutoff=$('sessionCutoff').value;
-  const{error}=await db.from('meal_sessions').insert({menu_template_id:Number($('sessionTemplate').value),meal_date:$('sessionDate').value,cutoff_at:cutoff?new Date(cutoff).toISOString():null,is_active:$('sessionActive').checked});
+  const{error}=await db.from('meal_sessions').insert({menu_template_id:Number($('sessionTemplate').value),meal_date:$('sessionDate').value,cutoff_at:cutoff?new Date(cutoff+':00+08:00').toISOString():null,is_active:$('sessionActive').checked});
   if(error)return toast(error.message);toast('訂餐日期已新增');$('sessionCutoff').value='';await loadSessions();
 });
-function localDatetime(v){if(!v)return'';const d=new Date(v),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes())}
+function localDatetime(v){if(!v)return'';const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(v));const m=Object.fromEntries(parts.map(x=>[x.type,x.value]));return m.year+'-'+m.month+'-'+m.day+'T'+m.hour+':'+m.minute}
 function openSessionDialog(id){const s=sessions.find(x=>x.id===id);if(!s)return;editingSessionId=id;$('editSessionTemplate').value=String(s.menu_template_id);$('editSessionDate').value=s.meal_date;$('editSessionCutoff').value=localDatetime(s.cutoff_at);$('editSessionActive').checked=s.is_active;$('sessionDialog').showModal()}
 $('sessionEditForm').addEventListener('submit',async e=>{
   e.preventDefault();const cutoff=$('editSessionCutoff').value;
-  const{error}=await db.from('meal_sessions').update({menu_template_id:Number($('editSessionTemplate').value),meal_date:$('editSessionDate').value,cutoff_at:cutoff?new Date(cutoff).toISOString():null,is_active:$('editSessionActive').checked,updated_at:new Date().toISOString()}).eq('id',editingSessionId);
+  const{error}=await db.from('meal_sessions').update({menu_template_id:Number($('editSessionTemplate').value),meal_date:$('editSessionDate').value,cutoff_at:cutoff?new Date(cutoff+':00+08:00').toISOString():null,is_active:$('editSessionActive').checked,updated_at:new Date().toISOString()}).eq('id',editingSessionId);
   if(error)return toast(error.message);$('sessionDialog').close();toast('訂餐日期已更新');await loadSessions();
 });
 $('deleteSessionBtn').addEventListener('click',async()=>{

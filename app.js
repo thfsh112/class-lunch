@@ -5,10 +5,10 @@ let student=null,sessions=[],orders=[],menuItems=[],orderItemsByOrder={},testSel
 const money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
 const PUSH_VAPID_PUBLIC_KEY='BIfooHITgKhbwNm9ufy7fUdoyaU46cxxSFFoAOPQrKHJ4RPHzsqYQb9CEMWflB4PlXmpyptPHWl-fvgiWjeW_kE';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-const today=()=>new Date().toLocaleDateString('en-CA');
+const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
 function fmtDate(v){const d=new Date(v+'T00:00:00');return d.toLocaleDateString('zh-TW',{month:'numeric',day:'numeric',weekday:'short'})}
-function fmtCutoff(v){if(!v)return'';return new Date(v).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+function fmtCutoff(v){if(!v)return'';return new Date(v).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}
 function expired(s){return !!s.cutoff_at&&new Date(s.cutoff_at).getTime()<=Date.now()}
 function countdown(s){
   if(!s.cutoff_at)return '未設定截止時間';
@@ -240,6 +240,11 @@ async function detachPushBeforeLogout(){
 }
 async function openAccountDialog(){
   $('passwordForm').reset();
+  const locked=student?.seat_number===99;
+  const section=$('passwordChangeSection');
+  if(section)section.classList.toggle('hidden',locked);
+  const note=$('passwordLockedNote');
+  if(note)note.classList.toggle('hidden',!locked);
   $('accountDialog').showModal();
   await refreshPushStatus();
 }
@@ -298,6 +303,7 @@ document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',
 
 $('passwordForm').addEventListener('submit',async e=>{
   e.preventDefault();
+  if(student?.seat_number===99)return toast('99 號密碼固定為 099，不能修改');
   const p1=$('newPassword').value,p2=$('newPassword2').value;
   if(p1.length<4)return toast('密碼至少 4 碼');
   if(p1!==p2)return toast('兩次密碼不一致');

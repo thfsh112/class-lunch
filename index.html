@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>班級訂飯 🍱</title>
-<link rel="icon" type="image/png" href="./icon-192.png?v=20261003-24">
-<link rel="apple-touch-icon" href="./icon-192.png?v=20261003-24">
+<link rel="icon" type="image/png" href="./icon-192.png?v=20261003-30">
+<link rel="apple-touch-icon" href="./icon-192.png?v=20261003-30">
 <meta name="theme-color" content="#f7e7c6">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="班級訂飯">
-<link rel="manifest" href="./manifest.webmanifest?v=20261003-27">
-<link rel="stylesheet" href="style.css?v=20261003-27">
+<link rel="manifest" href="./manifest.webmanifest?v=20261003-30">
+<link rel="stylesheet" href="style.css?v=20261003-30">
 </head>
 <body>
 <header class="top hero">
@@ -117,12 +117,15 @@
         <button id="disablePushBtn" class="ghost hidden" type="button">關閉通知</button>
       </div>
     </section>
-    <div class="account-divider"></div>
-    <h3 class="account-subtitle">修改密碼</h3>
-    <p class="hint">座號與姓名不能自行修改；姓名如需更正請找管理員。</p>
-    <label>新密碼<input id="newPassword" type="password" minlength="4" maxlength="64" required autocomplete="new-password" placeholder="至少 4 碼"></label>
-    <label>再次輸入<input id="newPassword2" type="password" minlength="4" maxlength="64" required autocomplete="new-password"></label>
-    <div class="dialog-actions"><button type="button" class="ghost" data-close="accountDialog">取消</button><button class="primary" type="submit">更新密碼</button></div>
+    <p id="passwordLockedNote" class="hint hidden">99 號管理帳號密碼固定為 099，不提供修改。</p>
+    <section id="passwordChangeSection">
+      <div class="account-divider"></div>
+      <h3 class="account-subtitle">修改密碼</h3>
+      <p class="hint">座號與姓名不能自行修改；姓名如需更正請找管理員。</p>
+      <label>新密碼<input id="newPassword" type="password" minlength="4" maxlength="64" required autocomplete="new-password" placeholder="至少 4 碼"></label>
+      <label>再次輸入<input id="newPassword2" type="password" minlength="4" maxlength="64" required autocomplete="new-password"></label>
+      <div class="dialog-actions"><button type="button" class="ghost" data-close="accountDialog">取消</button><button class="primary" type="submit">更新密碼</button></div>
+    </section>
   </form>
 </dialog>
 
@@ -130,6 +133,6 @@
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.APP_CONFIG={supabaseUrl:"https://roynzxilxumfzzuezelg.supabase.co",publishableKey:"sb_publishable_nvmHzVjH7bZ8F9cnJYzKCg_PSPlhCXU"};</script>
-<script src="pwa.js?v=20261003-29"></script>
-<script src="app.js?v=20261003-27"></script>
+<script src="pwa.js?v=20261003-30"></script>
+<script src="app.js?v=20261003-30"></script>
 </body></html>
