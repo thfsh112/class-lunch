@@ -30,7 +30,7 @@
     try{
       await cleanupOldRegistrations();
       let reg=await navigator.serviceWorker.register(
-        "/class-lunch/service-worker.js?v=20261003-18",
+        "/class-lunch/service-worker.js?v=20261003-19",
         {scope:"/class-lunch/",updateViaCache:"none"}
       );
       await navigator.serviceWorker.ready;
