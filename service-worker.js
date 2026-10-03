@@ -1,4 +1,4 @@
-const STATIC_CACHE="class-lunch-static-v20261003-04";
+const STATIC_CACHE="class-lunch-static-v20261003-05";
 const IMAGE_CACHE="class-lunch-menu-images-v1";
 
 const APP_SHELL=[
@@ -8,7 +8,7 @@ const APP_SHELL=[
   "./app.js?v=20261003-07",
   "./admin.js?v=20261003-08",
   "./pwa.js?v=20261003-03",
-  "./manifest.webmanifest?v=20261003-05",
+  "./manifest.webmanifest?v=20261003-06",
   "./install-icon-192.png?v=20261003-03",
   "./icon-512.svg?v=20261003-03"
 ];
