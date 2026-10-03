@@ -9,6 +9,94 @@ const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'nu
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
 function fmtDate(v){const d=new Date(v+'T00:00:00');return d.toLocaleDateString('zh-TW',{month:'numeric',day:'numeric',weekday:'short'})}
 function fmtCutoff(v){if(!v)return'';return new Date(v).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+const HISTORY_DB_NAME='class-lunch-history-v1';
+const HISTORY_DB_VERSION=1;
+let historyDbPromise=null;
+function getHistoryDb(){
+  if(historyDbPromise)return historyDbPromise;
+  historyDbPromise=new Promise((resolve,reject)=>{
+    const req=indexedDB.open(HISTORY_DB_NAME,HISTORY_DB_VERSION);
+    req.onupgradeneeded=()=>{
+      const idb=req.result;
+      if(!idb.objectStoreNames.contains('orders')){
+        const store=idb.createObjectStore('orders',{keyPath:'cache_key'});
+        store.createIndex('student_id','student_id',{unique:false});
+      }
+      if(!idb.objectStoreNames.contains('meta'))idb.createObjectStore('meta',{keyPath:'key'});
+    };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error||new Error('indexeddb_open_failed'));
+  });
+  return historyDbPromise;
+}
+const idbResult=req=>new Promise((resolve,reject)=>{
+  req.onsuccess=()=>resolve(req.result);
+  req.onerror=()=>reject(req.error||new Error('indexeddb_request_failed'));
+});
+async function getCachedHistory(studentId){
+  const idb=await getHistoryDb();
+  const tx=idb.transaction('orders','readonly');
+  const rows=await idbResult(tx.objectStore('orders').index('student_id').getAll(IDBKeyRange.only(studentId)));
+  return (rows||[]).sort((a,b)=>{
+    const ad=String(a.order_date||a.meal_date||''),bd=String(b.order_date||b.meal_date||'');
+    if(ad!==bd)return bd.localeCompare(ad);
+    return String(b.created_at||'').localeCompare(String(a.created_at||''));
+  });
+}
+async function getHistorySyncCursor(studentId){
+  const idb=await getHistoryDb();
+  const tx=idb.transaction('meta','readonly');
+  const row=await idbResult(tx.objectStore('meta').get('history-sync:'+studentId));
+  return row?.value||null;
+}
+async function applyHistoryDelta(studentId,delta){
+  const idb=await getHistoryDb();
+  await new Promise((resolve,reject)=>{
+    const tx=idb.transaction(['orders','meta'],'readwrite');
+    const ordersStore=tx.objectStore('orders');
+    for(const row of (delta?.upserts||[])){
+      ordersStore.put({...row,student_id:studentId,cache_key:studentId+':'+row.id});
+    }
+    for(const id of (delta?.deleted||[])){
+      ordersStore.delete(studentId+':'+id);
+    }
+    if(delta?.sync_at){
+      tx.objectStore('meta').put({key:'history-sync:'+studentId,value:delta.sync_at});
+    }
+    tx.oncomplete=()=>resolve();
+    tx.onerror=()=>reject(tx.error||new Error('indexeddb_write_failed'));
+    tx.onabort=()=>reject(tx.error||new Error('indexeddb_write_aborted'));
+  });
+}
+async function syncHistoryDelta(){
+  if(!student)return [];
+  const since=await getHistorySyncCursor(student.id);
+  const{data,error}=await db.rpc('get_class_lunch_history_delta',{p_since:since||null});
+  if(error)throw error;
+  await applyHistoryDelta(student.id,data||{});
+  return getCachedHistory(student.id);
+}
+function renderHistoryList(list){
+  const rows=list||[];
+  const total=rows.reduce((sum,o)=>sum+Number(o.unit_price||0),0);
+  const paid=rows.filter(o=>o.paid).length;
+  const hasMarket=rows.some(o=>o.unresolved_market);
+  $('historyCount').textContent=rows.length;
+  $('historyTotal').textContent=money(total)+(hasMarket?' ＋ 時價':'');
+  $('historyPaid').textContent=paid;
+  $('historyUnpaid').textContent=rows.length-paid;
+  $('historyList').innerHTML=rows.length?rows.map(o=>{
+    const date=o.meal_date||o.order_date||'';
+    const shop=o.menu_name||'歷史訂單';
+    return '<article class="history-row">'+
+      '<div class="history-date">'+esc(date?fmtDate(date):'—')+'</div>'+
+      '<div class="history-main"><div class="history-title"><b>'+esc(shop)+'</b><span class="'+(o.paid?'history-paid':'history-unpaid')+'">'+(o.paid?'已付款':'未付款')+'</span></div>'+
+      '<div class="history-items">'+esc(o.item_name||'未記錄品項')+'</div>'+
+      (o.note?'<small>備註：'+esc(o.note)+'</small>':'')+'</div>'+
+      '<strong class="history-price">'+money(o.unit_price)+(o.unresolved_market?' ＋ 時價':'')+'</strong>'+
+    '</article>';
+  }).join(''):'<div class="history-empty"><b>還沒有歷史訂單</b><span>完成第一次訂餐後會出現在這裡。</span></div>';
+}
 function expired(s){return !!s.cutoff_at&&new Date(s.cutoff_at).getTime()<=Date.now()}
 function countdown(s){
   if(!s.cutoff_at)return '未設定截止時間';
@@ -351,29 +439,55 @@ async function refresh(){
 }
 
 async function loadSessions(){
-  const [{data:ss,error:se},{data:os,error:oe}]=await Promise.all([
-    db.from('meal_sessions').select('id,meal_date,cutoff_at,is_active,menu_template_id,menu_templates(id,name,image_url,active)').eq('is_active',true).gte('meal_date',today()).order('meal_date'),
-    db.from('orders').select('id,meal_session_id,item_name,unit_price,note,paid,created_at,menu_item_id').eq('student_id',student.id).order('created_at',{ascending:false})
-  ]);
-  if(se||oe)return toast((se||oe).message);
-  sessions=(ss||[]).filter(x=>x.menu_templates?.active!==false);orders=os||[];$('menuCount').textContent=sessions.length+' 份';
+  const{data:ss,error:se}=await db.from('meal_sessions')
+    .select('id,meal_date,cutoff_at,is_active,menu_template_id,menu_templates(id,name,image_url,active)')
+    .eq('is_active',true)
+    .gte('meal_date',today())
+    .order('meal_date');
+  if(se)return toast(se.message);
+
+  sessions=(ss||[]).filter(x=>x.menu_templates?.active!==false);
+  $('menuCount').textContent=sessions.length+' 份';
+
+  orders=[];menuItems=[];orderItemsByOrder={};
   if(sessions.length){
-    const ids=[...new Set(sessions.map(s=>s.menu_template_id))];
-    const{data:mi,error:me}=await db.from('menu_items').select('id,menu_template_id,category,name,price,is_market_price,active,sort_order').in('menu_template_id',ids).eq('active',true).order('sort_order').order('id');
-    if(me)return toast('讀取菜單品項失敗：'+me.message);
+    const sessionIds=sessions.map(s=>s.id);
+    const templateIds=[...new Set(sessions.map(s=>s.menu_template_id))];
+
+    const [{data:os,error:oe},{data:mi,error:me}]=await Promise.all([
+      db.from('orders')
+        .select('id,meal_session_id,item_name,unit_price,note,paid,created_at,menu_item_id')
+        .eq('student_id',student.id)
+        .in('meal_session_id',sessionIds)
+        .order('created_at',{ascending:false}),
+      db.from('menu_items')
+        .select('id,menu_template_id,category,name,price,is_market_price,active,sort_order')
+        .in('menu_template_id',templateIds)
+        .eq('active',true)
+        .order('sort_order')
+        .order('id')
+    ]);
+    if(oe||me)return toast((oe||me).message);
+
+    orders=os||[];
     menuItems=mi||[];
-    orderItemsByOrder={};
+
     const orderIds=orders.map(o=>o.id);
     if(orderIds.length){
-      const{data:oi,error:oie}=await db.from('order_items').select('order_id,menu_item_id,quantity,unit_price,is_market_price,market_price_amount').in('order_id',orderIds).order('id');
+      const{data:oi,error:oie}=await db.from('order_items')
+        .select('order_id,menu_item_id,quantity,unit_price,is_market_price,market_price_amount')
+        .in('order_id',orderIds)
+        .order('id');
       if(oie)return toast('讀取訂單品項失敗：'+oie.message);
       for(const row of (oi||[])){
         if(!orderItemsByOrder[row.order_id])orderItemsByOrder[row.order_id]=[];
         orderItemsByOrder[row.order_id].push(row);
       }
     }
-  }else{menuItems=[];orderItemsByOrder={};}
-  renderSessionPicker();renderSessions();
+  }
+
+  renderSessionPicker();
+  renderSessions();
 }
 function renderSessionPicker(){
   const sel=$('sessionPicker'),previous=Number(sel.value);
@@ -486,43 +600,29 @@ async function cancelOrder(sessionId){
 async function openHistory(){
   if(!student)return;
   $('historyDialog').showModal();
-  $('historyList').innerHTML='<div class="loading">載入中…</div>';
+  $('historyList').innerHTML='<div class="loading">載入手機快取…</div>';
 
-  const{data:history,error}=await db.from('orders')
-    .select('id,item_name,unit_price,note,paid,order_date,created_at,meal_session_id,meal_sessions(meal_date,menu_templates(name))')
-    .eq('student_id',student.id)
-    .order('order_date',{ascending:false})
-    .order('created_at',{ascending:false});
-  if(error){$('historyList').innerHTML='<div class="loading">讀取失敗</div>';return toast('歷史訂單讀取失敗：'+error.message)}
-
-  const list=history||[],ids=list.map(x=>x.id);
-  let knownMarketOrders=new Set(),unresolvedMarketOrders=new Set();
-  if(ids.length){
-    const{data:oi}=await db.from('order_items').select('order_id,is_market_price,market_price_amount').in('order_id',ids).eq('is_market_price',true);
-    knownMarketOrders=new Set((oi||[]).map(x=>x.order_id));
-    unresolvedMarketOrders=new Set((oi||[]).filter(x=>x.market_price_amount==null).map(x=>x.order_id));
+  let cached=[];
+  try{
+    cached=await getCachedHistory(student.id);
+    if(cached.length)renderHistoryList(cached);
+    else $('historyList').innerHTML='<div class="loading">同步歷史訂單…</div>';
+  }catch(error){
+    console.warn('history_cache_read_failed',error);
   }
 
-  const total=list.reduce((sum,o)=>sum+Number(o.unit_price||0),0);
-  const paid=list.filter(o=>o.paid).length;
-  const hasMarket=list.some(o=>unresolvedMarketOrders.has(o.id)||(!knownMarketOrders.has(o.id)&&String(o.item_name||'').includes('（時價）')));
-  $('historyCount').textContent=list.length;
-  $('historyTotal').textContent=money(total)+(hasMarket?' ＋ 時價':'');
-  $('historyPaid').textContent=paid;
-  $('historyUnpaid').textContent=list.length-paid;
-
-  $('historyList').innerHTML=list.length?list.map(o=>{
-    const date=o.meal_sessions?.meal_date||o.order_date||'';
-    const shop=o.meal_sessions?.menu_templates?.name||'歷史訂單';
-    const market=unresolvedMarketOrders.has(o.id)||(!knownMarketOrders.has(o.id)&&String(o.item_name||'').includes('（時價）'));
-    return '<article class="history-row">'+
-      '<div class="history-date">'+esc(date?fmtDate(date):'—')+'</div>'+
-      '<div class="history-main"><div class="history-title"><b>'+esc(shop)+'</b><span class="'+(o.paid?'history-paid':'history-unpaid')+'">'+(o.paid?'已付款':'未付款')+'</span></div>'+
-      '<div class="history-items">'+esc(o.item_name||'未記錄品項')+'</div>'+
-      (o.note?'<small>備註：'+esc(o.note)+'</small>':'')+'</div>'+
-      '<strong class="history-price">'+money(o.unit_price)+(market?' ＋ 時價':'')+'</strong>'+
-    '</article>';
-  }).join(''):'<div class="history-empty"><b>還沒有歷史訂單</b><span>完成第一次訂餐後會出現在這裡。</span></div>';
+  try{
+    const fresh=await syncHistoryDelta();
+    renderHistoryList(fresh);
+  }catch(error){
+    console.error('history_delta_sync_failed',error);
+    if(cached.length){
+      toast('歷史同步失敗，先顯示手機上的快取');
+    }else{
+      $('historyList').innerHTML='<div class="loading">歷史訂單暫時無法同步</div>';
+      toast('歷史訂單同步失敗');
+    }
+  }
 }
 function openImage(u){$('largeImage').src=u;$('imageModal').classList.remove('hidden');document.body.style.overflow='hidden'}
 function closeImage(e){if(e&&e.target!==$('imageModal')&&!e.target.classList.contains('close'))return;$('imageModal').classList.add('hidden');$('largeImage').src='';document.body.style.overflow=''}
