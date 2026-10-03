@@ -27,3 +27,19 @@
 .ios-install-steps li::before{content:counter(ios-step);position:absolute;left:12px;top:12px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:#bf7b68;color:#fff}
 .ios-install-steps b,.ios-install-steps span{display:block}
 .ios-install-steps span{margin-top:3px;font-size:.9rem;color:#806b60;line-height:1.45}
+
+
+/* v1.40 admin quality-of-life */
+.app-version{position:fixed;right:max(10px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));z-index:900;border:1px solid #ddc9c0;background:#fffdfbcc;color:#8a7168;border-radius:999px;padding:5px 9px;font:700 11px/1 -apple-system,BlinkMacSystemFont,"Noto Sans TC",sans-serif;box-shadow:0 4px 14px #5d403712;cursor:pointer;backdrop-filter:blur(8px)}
+.app-version:hover{opacity:1}.app-version:disabled{opacity:.6;cursor:wait}
+.unpaid-summary .all-paid{padding:12px;border-radius:12px;background:#edf7ee;color:#52775a;font-weight:800;text-align:center}
+.unpaid-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px}
+.order-notes-summary{margin-top:16px;padding-top:12px;border-top:1px solid #eadbd4}.order-notes-summary h3{margin-bottom:6px}
+.change-list,.backup-list{display:grid;gap:10px;margin-top:14px}
+.change-row,.backup-row{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border:1px solid #eadbd4;border-radius:14px;padding:13px 14px;background:#fff}
+.change-main{min-width:0}.change-title,.backup-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.change-title span,.backup-title span{font-size:11px;padding:3px 7px;border-radius:999px;background:#f4e7e1;color:#745b53;font-weight:800}
+.change-row p{margin:6px 0;font-size:13px;line-height:1.55;word-break:break-word}.change-row small,.backup-row small{display:block;margin-top:4px;color:#927d74;font-size:12px}.change-row time{white-space:nowrap;color:#927d74;font-size:12px}
+.backup-controls{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}.backup-controls label{margin:0;min-width:210px}.backup-controls .primary{margin-bottom:0}
+.backup-row>div{min-width:0}.backup-row button{white-space:nowrap}
+.danger-zone{margin-top:14px;padding-top:10px;border-top:1px dashed #e2c8be}.danger-zone summary{cursor:pointer;color:#9a5a50;font-weight:800}.danger-zone p{margin:8px 0}
+@media(max-width:720px){.unpaid-list{grid-template-columns:1fr}.change-row,.backup-row{flex-direction:column}.change-row time{white-space:normal}.backup-row button{width:100%}.backup-controls{align-items:stretch;flex-direction:column}.backup-controls label{min-width:0;width:100%}}

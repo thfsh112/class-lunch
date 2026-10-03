@@ -1,4 +1,4 @@
-let latestOverviewCopyText='';
+let latestOverviewCopyText='',latestUnpaidCopyText='';
 const{createClient}=supabase;
 const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'class-lunch-admin-auth'}});
 const legacyDb=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:false,detectSessionInUrl:false}});
@@ -55,7 +55,14 @@ $('logoutBtn').addEventListener('click',async()=>{
 });
 $('adminAccountBtn')?.addEventListener('click',()=>toast('99 號密碼固定為 099，不能修改'));
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>$(b.dataset.close).close()));
-document.querySelectorAll('.tab[data-tab]').forEach(b=>b.addEventListener('click',async()=>{document.querySelectorAll('.tab[data-tab]').forEach(x=>x.classList.toggle('active',x===b));document.querySelectorAll('.tab-page').forEach(p=>p.classList.add('hidden'));$('tab-'+b.dataset.tab).classList.remove('hidden');if(b.dataset.tab==='logs')await loadLogs()}));
+document.querySelectorAll('.tab[data-tab]').forEach(b=>b.addEventListener('click',async()=>{
+  document.querySelectorAll('.tab[data-tab]').forEach(x=>x.classList.toggle('active',x===b));
+  document.querySelectorAll('.tab-page').forEach(p=>p.classList.add('hidden'));
+  $('tab-'+b.dataset.tab).classList.remove('hidden');
+  if(b.dataset.tab==='logs')await loadLogs();
+  if(b.dataset.tab==='changes')await loadOrderChanges();
+  if(b.dataset.tab==='backups')await loadBackups();
+}));
 
 async function migrateLegacyAdminSession(){
   if(legacyAdminChecked)return;
@@ -79,6 +86,7 @@ async function refresh(){
   if(!ok){stopAdminRealtime();return}
   startAdminRealtime();
   $('sessionDate').value=today();
+  if($('backupDate')&&!$('backupDate').value)$('backupDate').value=today();
   applyDefaultSessionCutoff(true);
   await Promise.all([loadTemplates(),loadSessions(),loadStudents()]);
   renderTemplateSelect();renderSessionList();renderStudentList();renderOverviewSelect();renderInitStatus();
@@ -329,11 +337,22 @@ $('sessionEditForm').addEventListener('submit',async e=>{
   const{error}=await db.from('meal_sessions').update({menu_template_id:Number($('editSessionTemplate').value),meal_date:$('editSessionDate').value,cutoff_at:cutoff?new Date(cutoff+':00+08:00').toISOString():null,is_active:$('editSessionActive').checked,updated_at:new Date().toISOString()}).eq('id',editingSessionId);
   if(error)return toast(error.message);$('sessionDialog').close();toast('訂餐日期已更新');await loadSessions();
 });
+$('archiveSessionBtn').addEventListener('click',async()=>{
+  const s=sessions.find(x=>x.id===editingSessionId);if(!s)return;
+  if(!confirm('確定封存 '+s.meal_date+'？封存後不再開放訂餐，但訂單與歷史資料都會保留。'))return;
+  const{error}=await db.from('meal_sessions').update({is_active:false,updated_at:new Date().toISOString()}).eq('id',editingSessionId);
+  if(error)return toast(error.message);
+  $('sessionDialog').close();toast('訂餐日期已封存');await loadSessions();
+});
 $('deleteSessionBtn').addEventListener('click',async()=>{
   const s=sessions.find(x=>x.id===editingSessionId);if(!s)return;
-  if(!confirm('確定刪除 '+s.meal_date+' 的訂餐日期？若已有訂單，相關訂單也會一起刪除。'))return;
-  const{error}=await db.from('meal_sessions').delete().eq('id',editingSessionId);if(error)return toast(error.message);
-  $('sessionDialog').close();toast('訂餐日期已刪除');await loadSessions();
+  const{count,error:countError}=await db.from('orders').select('id',{count:'exact',head:true}).eq('meal_session_id',editingSessionId);
+  if(countError)return toast('檢查訂單失敗：'+countError.message);
+  if((count||0)>0)return toast('這個日期已有訂單，為避免資料遺失只能封存，不能永久刪除');
+  if(!confirm('永久刪除 '+s.meal_date+'？此動作無法復原。'))return;
+  const{error}=await db.from('meal_sessions').delete().eq('id',editingSessionId);
+  if(error)return toast('刪除失敗：'+error.message);
+  $('sessionDialog').close();toast('空白訂餐日期已永久刪除');await loadSessions();
 });
 
 function openStudentDialog(id){const s=students.find(x=>x.id===id);if(!s)return;editingStudentId=id;$('editStudentSeat').textContent=s.seat_number+'號';$('editStudentName').value=s.name||'';$('editStudentActive').checked=s.active;$('editStudentPassword').value='';$('studentDialog').showModal()}
@@ -403,6 +422,19 @@ async function loadOverview(){
     .filter(Boolean)
     .sort((a,b)=>Number(a.seat||999)-Number(b.seat||999));
   const sessionLabel=[s?.meal_date,s?.menu_templates?.name||'菜單'].filter(Boolean).join(' ');
+  const unpaidRows=list.filter(o=>!o.paid).map(o=>{
+    const st=students.find(x=>x.id===o.student_id);
+    const seat=st?.seat_number||Number(o.student_name)||'？';
+    return {seat,name:st?.name||'',item:o.item_name||'未記錄品項',amount:Number(o.unit_price||0),market:unresolvedOrders.has(o.id)};
+  }).sort((a,b)=>Number(a.seat||999)-Number(b.seat||999));
+  latestUnpaidCopyText=unpaidRows.length?[
+    '【'+sessionLabel+' 未付款名單】',
+    ...unpaidRows.map(x=>x.seat+'號'+(x.name?' '+x.name:'')+'｜'+x.item+'｜'+money(x.amount)+(x.market?' ＋ 時價':'')),
+    '────────',
+    '共 '+unpaidRows.length+' 人未付款'
+  ].join('\n'):'';
+  $('unpaidSummary').innerHTML='<div class="item-stats-head"><h3>未付款名單</h3><div class="btnrow"><span>'+unpaidRows.length+' 人</span>'+(unpaidRows.length?'<button class="small-btn" type="button" onclick="copyUnpaidList()">一鍵複製 LINE</button>':'')+'</div></div>'+
+    (unpaidRows.length?'<div class="unpaid-list">'+unpaidRows.map(x=>'<div class="item-stat-row"><span><b>'+esc(x.seat+'號'+(x.name?' '+x.name:''))+'</b><br><small>'+esc(x.item)+'</small></span><strong>'+money(x.amount)+(x.market?' ＋ 時價':'')+'</strong></div>').join('')+'</div>':'<div class="all-paid">✓ 目前全部已付款</div>');
   latestOverviewCopyText=[
     '【'+sessionLabel+' 訂餐統計】',
     ...(itemRows.length?itemRows.map(([name,qty])=>name+'：'+qty+'份'):['目前沒有品項']),
@@ -447,6 +479,23 @@ async function copyOverviewStats(){
     toast(ok?'統計已複製，可直接貼到 LINE':'複製失敗，請再試一次');
   }
 }
+async function copyUnpaidList(){
+  if(!latestUnpaidCopyText)return toast('目前沒有未付款名單');
+  try{
+    await navigator.clipboard.writeText(latestUnpaidCopyText);
+    toast('未付款名單已複製，可直接貼到 LINE');
+  }catch{
+    const ta=document.createElement('textarea');
+    ta.value=latestUnpaidCopyText;
+    ta.setAttribute('readonly','');
+    ta.style.position='fixed';ta.style.opacity='0';ta.style.pointerEvents='none';
+    document.body.appendChild(ta);ta.select();
+    const ok=document.execCommand('copy');
+    ta.remove();
+    toast(ok?'未付款名單已複製，可直接貼到 LINE':'複製失敗，請再試一次');
+  }
+}
+
 async function openMarketPriceDialog(orderId,seat){
   editingMarketOrderId=orderId;
   $('marketPriceSeat').textContent=seat+'號訂單';
@@ -494,6 +543,114 @@ $('marketPriceForm').addEventListener('submit',async e=>{
 
 async function togglePaid(id,n){const{error}=await db.from('orders').update({paid:n}).eq('id',id);if(error)return toast(error.message);toast(n?'已付款':'已改未付款');loadOverview()}
 async function deleteOrder(id){if(!confirm('確定刪除這筆訂單？'))return;const{error}=await db.from('orders').delete().eq('id',id);if(error)return toast(error.message);toast('已刪除');loadOverview()}
+
+function fmtAdminTime(v){
+  return new Date(v).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+function orderActorLabel(l,row){
+  if(l.actor_type==='admin')return '管理員';
+  const st=students.find(s=>s.auth_user_id===l.actor_user_id);
+  if(st)return st.seat_number+'號 '+(st.name||'');
+  const seat=Number(row?.student_name);
+  if(seat)return seat+'號';
+  return l.actor_email||'系統';
+}
+function readableValue(v){
+  if(v===null||v===undefined||v==='')return '空白';
+  return String(v);
+}
+function describeOrderChange(l,itemNames){
+  const old=l.detail?.old||{},now=l.detail?.new||{};
+  if(l.entity_type==='orders'){
+    const row=l.action==='delete'?old:now;
+    if(l.action==='insert')return {row,title:'建立訂單',detail:(row.item_name||'未記錄品項')+' · '+money(row.unit_price)+(row.note?' · 備註：'+row.note:'')};
+    if(l.action==='delete')return {row,title:'刪除訂單',detail:(row.item_name||'未記錄品項')+' · '+money(row.unit_price)+(row.note?' · 備註：'+row.note:'')};
+    const diff=[];
+    if(old.item_name!==now.item_name)diff.push('餐點：'+readableValue(old.item_name)+' → '+readableValue(now.item_name));
+    if(Number(old.unit_price||0)!==Number(now.unit_price||0))diff.push('金額：'+money(old.unit_price)+' → '+money(now.unit_price));
+    if(String(old.note||'')!==String(now.note||''))diff.push('備註：'+readableValue(old.note)+' → '+readableValue(now.note));
+    if(Boolean(old.paid)!==Boolean(now.paid))diff.push('付款：'+(old.paid?'已付款':'未付款')+' → '+(now.paid?'已付款':'未付款'));
+    if(Number(old.quantity||1)!==Number(now.quantity||1))diff.push('數量：'+Number(old.quantity||1)+' → '+Number(now.quantity||1));
+    if(String(old.order_date||'')!==String(now.order_date||''))diff.push('日期：'+readableValue(old.order_date)+' → '+readableValue(now.order_date));
+    if(!diff.length)return null;
+    return {row:now,title:'修改訂單',detail:diff.join('；')};
+  }
+  const row=l.action==='delete'?old:now;
+  const oldName=itemNames.get(Number(old.menu_item_id))||('品項 #'+readableValue(old.menu_item_id));
+  const newName=itemNames.get(Number(now.menu_item_id))||('品項 #'+readableValue(now.menu_item_id));
+  if(l.action==='insert')return {row,title:'新增訂單品項',detail:newName+' × '+Number(now.quantity||1)+' · '+money(now.unit_price)};
+  if(l.action==='delete')return {row,title:'刪除訂單品項',detail:oldName+' × '+Number(old.quantity||1)+' · '+money(old.unit_price)};
+  const diff=[];
+  if(Number(old.menu_item_id)!==Number(now.menu_item_id))diff.push('品項：'+oldName+' → '+newName);
+  if(Number(old.quantity||1)!==Number(now.quantity||1))diff.push('數量：'+Number(old.quantity||1)+' → '+Number(now.quantity||1));
+  if(Number(old.unit_price||0)!==Number(now.unit_price||0))diff.push('單價：'+money(old.unit_price)+' → '+money(now.unit_price));
+  if(old.market_price_amount!==now.market_price_amount)diff.push('時價：'+(old.market_price_amount==null?'未設定':money(old.market_price_amount))+' → '+(now.market_price_amount==null?'未設定':money(now.market_price_amount)));
+  if(!diff.length)return null;
+  return {row:now,title:'修改訂單品項',detail:diff.join('；')};
+}
+async function loadOrderChanges(){
+  const box=$('orderChangeList');
+  if(!box)return;
+  box.innerHTML='<div class="loading">載入中…</div>';
+  const{data,error}=await db.from('class_lunch_audit_logs')
+    .select('id,actor_user_id,actor_email,actor_type,action,entity_type,entity_id,detail,created_at')
+    .in('entity_type',['orders','order_items'])
+    .order('created_at',{ascending:false})
+    .limit(300);
+  if(error){box.innerHTML='<div class="loading">讀取失敗</div>';return toast(error.message)}
+  const rows=data||[];
+  const menuIds=[...new Set(rows.flatMap(l=>[l.detail?.old?.menu_item_id,l.detail?.new?.menu_item_id]).filter(Boolean).map(Number))];
+  const itemNames=new Map();
+  if(menuIds.length){
+    const r=await db.from('menu_items').select('id,name').in('id',menuIds);
+    for(const x of (r.data||[]))itemNames.set(Number(x.id),x.name);
+  }
+  const rendered=rows.map(l=>{
+    const d=describeOrderChange(l,itemNames);
+    if(!d)return '';
+    const actor=orderActorLabel(l,d.row);
+    const seat=d.row?.student_name?String(d.row.student_name)+'號':actor;
+    return '<div class="change-row"><div class="change-main"><div class="change-title"><b>'+esc(d.title)+'</b><span>'+esc(seat)+'</span></div><p>'+esc(d.detail)+'</p><small>'+esc(actor)+'</small></div><time>'+esc(fmtAdminTime(l.created_at))+'</time></div>';
+  }).filter(Boolean);
+  box.innerHTML=rendered.length?rendered.join(''):'<div class="loading">目前沒有訂單異動紀錄</div>';
+}
+$('refreshChangesBtn')?.addEventListener('click',loadOrderChanges);
+
+async function loadBackups(){
+  const box=$('backupList');
+  if(!box)return;
+  box.innerHTML='<div class="loading">載入中…</div>';
+  const{data,error}=await db.from('class_lunch_backups')
+    .select('id,backup_type,meal_date,summary,created_by_email,created_at')
+    .order('created_at',{ascending:false});
+  if(error){box.innerHTML='<div class="loading">讀取失敗</div>';return toast(error.message)}
+  const rows=data||[];
+  box.innerHTML=rows.length?rows.map(b=>{
+    const s=b.summary||{};
+    const type=b.backup_type==='daily'?'每日自動':'手動';
+    return '<div class="backup-row"><div><div class="backup-title"><b>'+esc(b.meal_date)+'</b><span>'+type+'</span></div><small>訂單 '+Number(s.orders||0)+' 筆 · 已付 '+Number(s.paid||0)+' · 未付 '+Number(s.unpaid||0)+' · '+money(s.total||0)+'</small><small>'+esc(fmtAdminTime(b.created_at))+'</small></div><button class="small-btn" type="button" onclick="downloadBackup('+b.id+')">下載 JSON</button></div>';
+  }).join(''):'<div class="loading">目前還沒有備份紀錄</div>';
+}
+$('refreshBackupsBtn')?.addEventListener('click',loadBackups);
+$('createBackupBtn')?.addEventListener('click',async()=>{
+  const date=$('backupDate').value||today(),btn=$('createBackupBtn');
+  btn.disabled=true;btn.textContent='備份中…';
+  const{data,error}=await db.rpc('create_class_lunch_backup',{p_meal_date:date});
+  btn.disabled=false;btn.textContent='立即備份';
+  if(error)return toast('備份失敗：'+error.message);
+  toast('已建立 '+date+' 的備份 #'+data);
+  await loadBackups();
+});
+async function downloadBackup(id){
+  const{data,error}=await db.from('class_lunch_backups').select('id,backup_type,meal_date,summary,snapshot,created_at').eq('id',id).single();
+  if(error||!data)return toast('讀取備份失敗：'+(error?.message||'找不到資料'));
+  const payload={backup_id:data.id,backup_type:data.backup_type,meal_date:data.meal_date,created_at:data.created_at,summary:data.summary,snapshot:data.snapshot};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='class-lunch-backup-'+data.meal_date+'-'+data.id+'.json';
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast('備份 JSON 已產生');
+}
 
 function logLabel(l){
   const a=l.action,e=l.entity_type;

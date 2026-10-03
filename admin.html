@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-Hant">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>訂飯管理</title><link rel="icon" type="image/png" sizes="180x180" href="icon-192.png?v=20261003-39"><link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?v=20261003-39"><meta name="theme-color" content="#f7e7c6"><link rel="manifest" href="manifest.webmanifest?v=20261003-39"><link rel="stylesheet" href="style.css?v=20261003-39"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>訂飯管理</title><link rel="icon" type="image/png" sizes="180x180" href="icon-192.png?v=20261003-40"><link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?v=20261003-40"><meta name="theme-color" content="#f7e7c6"><link rel="manifest" href="manifest.webmanifest?v=20261003-40"><link rel="stylesheet" href="style.css?v=20261003-40"></head>
 <body>
 <header class="top"><div><div class="eyebrow">ADMIN</div><h1>訂飯管理</h1><p id="loginStatus">請先在首頁登入 99 號，再進入管理頁。</p></div><a class="admin-link" href="index.html">回首頁</a></header>
 <main>
@@ -11,12 +11,14 @@
     <button class="tab" data-tab="sessions">訂餐日期</button>
     <button class="tab" data-tab="templates">菜單庫</button>
     <button class="tab" data-tab="students">學生管理</button>
+    <button class="tab" data-tab="changes">訂單異動</button>
+    <button class="tab" data-tab="backups">備份</button>
     <button class="tab" data-tab="logs">操作紀錄</button>
     <button class="tab ghost" id="adminAccountBtn" type="button">99 密碼固定</button>
     <button class="tab ghost" id="logoutBtn">登出</button>
   </div>
 
-  <section id="tab-overview" class="tab-page"><div class="panel"><div class="section-head"><h2>訂單總覽</h2><select id="overviewSession"></select></div><div class="stats"><div class="stat"><small>已訂</small><b id="statOrders">0</b></div><div class="stat"><small>已付款</small><b id="statPaid">0</b></div><div class="stat"><small>未付款</small><b id="statUnpaidCount">0</b></div><div class="stat"><small>總金額</small><b id="statTotal">$0</b></div></div><div id="itemStats" class="item-stats"></div><div id="seatPayments"></div></div></section>
+  <section id="tab-overview" class="tab-page"><div class="panel"><div class="section-head"><h2>訂單總覽</h2><select id="overviewSession"></select></div><div class="stats"><div class="stat"><small>已訂</small><b id="statOrders">0</b></div><div class="stat"><small>已付款</small><b id="statPaid">0</b></div><div class="stat"><small>未付款</small><b id="statUnpaidCount">0</b></div><div class="stat"><small>總金額</small><b id="statTotal">$0</b></div></div><div id="itemStats" class="item-stats"></div><div id="unpaidSummary" class="item-stats unpaid-summary"></div><div id="seatPayments"></div></div></section>
 
   <section id="tab-sessions" class="tab-page hidden">
     <div class="panel"><h2>新增訂餐日期</h2><form id="sessionForm" class="admin-form-grid"><label>菜單<select id="sessionTemplate" required></select></label><label>供餐日期<input id="sessionDate" type="date" required></label><label>截止時間<input id="sessionCutoff" type="datetime-local"><small class="hint">預設為供餐日當天 10:00，可自行調整。</small></label><label class="check-row"><input id="sessionActive" type="checkbox" checked> 開放</label><button class="primary" type="submit">新增日期</button></form></div>
@@ -33,6 +35,27 @@
       <div class="section-head"><div><h2>學生名單</h2><p class="hint">學生帳號只需初始化一次，不會再於後台登入時自動執行。</p></div><span id="studentCount"></span></div>
       <div class="init-bar"><span id="initStatus">檢查帳號中…</span><button id="initStudentsBtn" class="primary" type="button">初始化學生帳號</button></div>
       <div id="studentList"></div>
+    </div>
+  </section>
+
+  <section id="tab-changes" class="tab-page hidden">
+    <div class="panel">
+      <div class="section-head"><div><h2>訂單異動</h2><p class="hint">記錄建立、修改、刪除、付款與時價變更；只顯示實際有變動的內容。</p></div><button id="refreshChangesBtn" class="small-btn" type="button">重新整理</button></div>
+      <div id="orderChangeList" class="change-list"><div class="loading">載入中…</div></div>
+    </div>
+  </section>
+
+  <section id="tab-backups" class="tab-page hidden">
+    <div class="panel">
+      <div class="section-head"><div><h2>訂單備份</h2><p class="hint">每天 23:50（台灣時間）自動備份開放中的訂餐日期；也可手動備份指定日期。每一次備份都會保留紀錄。</p></div></div>
+      <div class="backup-controls">
+        <label>備份日期<input id="backupDate" type="date"></label>
+        <button id="createBackupBtn" class="primary" type="button">立即備份</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="section-head"><h2>備份紀錄</h2><button id="refreshBackupsBtn" class="small-btn" type="button">重新整理</button></div>
+      <div id="backupList" class="backup-list"><div class="loading">載入中…</div></div>
     </div>
   </section>
 
@@ -66,7 +89,8 @@
     <label>供餐日期<input id="editSessionDate" type="date" required></label>
     <label>截止時間<input id="editSessionCutoff" type="datetime-local"></label>
     <label class="check-row"><input id="editSessionActive" type="checkbox"> 開放</label>
-    <div class="dialog-actions spread"><button id="deleteSessionBtn" type="button" class="small-btn danger">刪除此日期</button><div><button type="button" class="ghost" data-close="sessionDialog">取消</button> <button class="primary" type="submit">儲存</button></div></div>
+    <div class="dialog-actions spread"><button id="archiveSessionBtn" type="button" class="small-btn">封存此日期</button><div><button type="button" class="ghost" data-close="sessionDialog">取消</button> <button class="primary" type="submit">儲存</button></div></div>
+    <details class="danger-zone"><summary>進階操作</summary><p class="hint">永久刪除只允許「完全沒有訂單」的日期；已有訂單的日期只能封存。</p><button id="deleteSessionBtn" type="button" class="small-btn danger">永久刪除（僅限無訂單）</button></details>
   </form>
 </dialog>
 
@@ -90,10 +114,11 @@
   </form>
 </dialog>
 
+<button class="app-version" type="button" data-app-version title="點一下重新載入最新版">1.40</button>
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>window.APP_CONFIG={supabaseUrl:"https://roynzxilxumfzzuezelg.supabase.co",publishableKey:"sb_publishable_nvmHzVjH7bZ8F9cnJYzKCg_PSPlhCXU"};</script>
-<script src="pwa.js?v=20261003-39"></script>
-<script src="admin.js?v=20261003-39"></script>
+<script src="pwa.js?v=20261003-40"></script>
+<script src="admin.js?v=20261003-40"></script>
 </body></html>

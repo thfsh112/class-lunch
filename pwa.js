@@ -1,4 +1,23 @@
 (()=>{
+  const DISPLAY_VERSION="1.40";
+  document.querySelectorAll("[data-app-version]").forEach(btn=>{
+    btn.textContent=DISPLAY_VERSION;
+    btn.addEventListener("click",async()=>{
+      if(btn.disabled)return;
+      btn.disabled=true;btn.textContent="更新中…";
+      try{
+        if("serviceWorker" in navigator){
+          const regs=await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.filter(r=>r.scope.includes("/class-lunch/")).map(r=>r.update().catch(()=>null)));
+        }
+        if("caches" in window){
+          const keys=await caches.keys();
+          await Promise.all(keys.filter(k=>k.startsWith("class-lunch-static-")).map(k=>caches.delete(k)));
+        }
+      }catch(error){console.warn("class_lunch_force_refresh_failed",error)}
+      const u=new URL(location.href);u.searchParams.set("_refresh",Date.now().toString());location.replace(u.href);
+    });
+  });
   if(!("serviceWorker" in navigator)){
     window.CLASS_LUNCH_PWA_STATUS={supported:false,ready:false,error:"service_worker_unsupported"};
     return;
@@ -29,7 +48,7 @@
   async function registerPwa(){
     try{
       await cleanupOldRegistrations();
-      let reg=await navigator.serviceWorker.register("/class-lunch/service-worker.js?v=20261003-39",{scope:"/class-lunch/",updateViaCache:"none"});
+      let reg=await navigator.serviceWorker.register("/class-lunch/service-worker.js?v=20261003-40",{scope:"/class-lunch/",updateViaCache:"none"});
       await navigator.serviceWorker.ready;
       try{await reg.update()}catch{}
       window.CLASS_LUNCH_PWA_STATUS={supported:true,ready:true,error:null,registration:reg};
