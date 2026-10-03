@@ -1,4 +1,4 @@
-name: Rebuild PWA icons from original source
+name: Rebuild PWA icons from valid 192 source
 
 on:
   push:
@@ -19,36 +19,35 @@ jobs:
       - name: Install Pillow
         run: python -m pip install --quiet pillow
 
-      - name: Extract original icon source
-        run: git show 3503179c6e7ee015b6bee949506a91cd9844bc58:icon.png > /tmp/icon-source.png
+      - name: Extract known-good historical 192 icon
+        run: git show 6a54fbf0171ef84e1466d5534cab4a746c00bd78:install-icon-192.png > /tmp/icon-source-192.png
 
       - name: Rebuild and validate PWA icons
         run: |
           python - <<'PY'
           from PIL import Image, ImageStat
 
-          src = Image.open("/tmp/icon-source.png")
-          src.load()
-          print("source", src.size, src.mode, src.getextrema())
+          with Image.open("/tmp/icon-source-192.png") as src:
+              src.load()
+              rgb = src.convert("RGB")
+              print("source", src.size, src.mode, rgb.getextrema(), [round(x,1) for x in ImageStat.Stat(rgb).mean])
 
-          rgb = src.convert("RGB")
-          spread = sum(hi - lo for lo, hi in rgb.getextrema())
-          if spread < 60:
-              raise SystemExit("original icon source looks blank/uniform")
+          if rgb.size != (192, 192):
+              raise SystemExit(f"source size is {rgb.size}, expected 192x192")
 
           for size in (192, 512):
-              out = rgb.resize((size, size), Image.Resampling.LANCZOS)
+              out = rgb if size == 192 else rgb.resize((size, size), Image.Resampling.LANCZOS)
               path = f"icon-{size}.png"
               out.save(path, "PNG", optimize=True)
 
               with Image.open(path) as check:
                   check.load()
-                  stat = ImageStat.Stat(check)
                   extrema = check.getextrema()
+                  mean = [round(x,1) for x in ImageStat.Stat(check).mean]
                   spread = sum(hi - lo for lo, hi in extrema)
                   if check.size != (size, size) or check.mode != "RGB" or spread < 60:
                       raise SystemExit(f"{path}: validation failed {check.size} {check.mode} {extrema}")
-                  print(path, check.size, check.mode, extrema, [round(x,1) for x in stat.mean])
+                  print("OK", path, check.size, check.mode, extrema, mean)
           PY
 
       - name: Commit rebuilt icons
@@ -57,5 +56,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add icon-192.png icon-512.png
           git diff --cached --quiet && exit 0
-          git commit -m "Rebuild PWA icons from original source image"
+          git commit -m "Restore PWA icons from valid historical source"
           git push
