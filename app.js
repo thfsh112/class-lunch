@@ -30,8 +30,15 @@ function urlBase64ToUint8Array(base64String){
 }
 async function getPushRegistration(){
   if(!('serviceWorker' in navigator))return null;
-  const direct=await navigator.serviceWorker.getRegistration('/class-lunch/');
-  return direct||await navigator.serviceWorker.ready;
+  const scopeUrl=new URL('/class-lunch/',location.origin).href;
+  const regs=await navigator.serviceWorker.getRegistrations();
+  let reg=regs.find(r=>r.scope===scopeUrl||r.active?.scriptURL?.includes('/class-lunch/service-worker.js'));
+  if(!reg){
+    reg=await navigator.serviceWorker.register('/class-lunch/service-worker.js?v=20261003-15',{scope:'/class-lunch/',updateViaCache:'none'});
+  }
+  await reg.update().catch(()=>null);
+  if(!reg.active)reg=await navigator.serviceWorker.ready;
+  return reg;
 }
 async function getCurrentPushSubscription(){
   try{
@@ -93,8 +100,20 @@ async function enablePushNotifications(){
     await refreshPushStatus();
     toast('訂餐通知已開啟');
   }catch(error){
-    console.error(error);
-    toast('開啟通知失敗');
+    console.error('push_enable_failed',error);
+    const status=$('pushStatusText');
+    const name=String(error?.name||'');
+    const message=String(error?.message||error||'未知錯誤');
+    let readable='開啟通知失敗：'+(name?name+' · ':'')+message;
+    if(name==='NotAllowedError'||/permission|denied|not.?allowed/i.test(message)){
+      readable='通知被瀏覽器或系統封鎖，請到通知權限設定允許後再試。';
+    }else if(name==='AbortError'){
+      readable='瀏覽器無法建立推播訂閱，請確認瀏覽器與系統通知功能可用後再試。';
+    }else if(/service_worker_missing/i.test(message)){
+      readable='通知服務尚未就緒，請完全關閉「班級訂飯」後重新開啟再試。';
+    }
+    if(status)status.textContent=readable;
+    toast(readable);
   }
 }
 async function disablePushNotifications(){
