@@ -1,16 +1,17 @@
-const STATIC_CACHE="class-lunch-static-v20261003-11";
+const STATIC_CACHE="class-lunch-static-v20261003-13";
 const IMAGE_CACHE="class-lunch-menu-images-v1";
 
 const APP_SHELL=[
   "./index.html",
   "./admin.html",
-  "./style.css?v=20261003-11",
-  "./app.js?v=20261003-11",
-  "./admin.js?v=20261003-11",
-  "./pwa.js?v=20261003-11",
-  "./manifest.webmanifest?v=20261003-11",
-  "./install-icon-192.png?v=20261003-11",
-  "./icon-512.svg?v=20261003-11"
+  "./style.css?v=20261003-13",
+  "./app.js?v=20261003-13",
+  "./admin.js?v=20261003-13",
+  "./pwa.js?v=20261003-13",
+  "./manifest.webmanifest?v=20261003-13",
+  "./install-icon-192.png?v=20261003-13",
+  "./install-icon-512.png?v=20261003-13",
+  "./icon-512.svg?v=20261003-13"
 ];
 
 self.addEventListener("install",event=>{
