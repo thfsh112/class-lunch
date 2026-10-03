@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>班級訂飯 🍱</title>
+<link rel="icon" type="image/png" href="install-icon-192.png?v=20261003-02">
+<link rel="apple-touch-icon" href="install-icon-192.png?v=20261003-02">
+<meta name="theme-color" content="#f7e7c6">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="班級訂飯">
+<link rel="manifest" href="manifest.webmanifest?v=20261003-04">
+<link rel="stylesheet" href="style.css?v=20261003-03">
+</head>
+<body>
+<header class="top hero">
+  <div class="hero-copy">
+    <div class="eyebrow">CLASS LUNCH</div>
+    <h1>今天吃什麼？<span class="hero-emoji">🍱</span></h1>
+    <p id="welcomeText">登入後查看開放中的訂餐。</p>
+  </div>
+  <div id="heroAccount" class="hero-account hidden">
+    <div class="hero-user">
+      <span class="hero-user-label">目前登入</span>
+      <strong id="heroIdentity">—</strong>
+    </div>
+    <div class="header-actions">
+      <button id="historyBtn" class="hero-action hidden" type="button">歷史訂單</button>
+      <button id="accountBtn" class="hero-action hidden" type="button">帳號設定</button>
+      <a id="adminLink" class="hero-action admin-link hidden" href="admin.html">管理</a>
+      <button id="logoutBtn" class="hero-action subtle hidden" type="button">登出</button>
+    </div>
+  </div>
+</header>
+<main>
+<section id="loginBox" class="panel login-panel">
+  <h2>學生登入</h2>
+  <form id="loginForm">
+    <label>座號<input id="seatLogin" type="number" min="1" max="99" inputmode="numeric" required placeholder="例如 3"></label>
+    <label>密碼<input id="passwordLogin" type="password" required autocomplete="current-password"></label>
+    <button class="primary" type="submit">登入</button>
+  </form>
+  <p class="hint">第一次登入密碼為座號三位數，例如 1 號是 001。</p>
+</section>
+
+<section id="setupBox" class="panel login-panel hidden">
+  <h2>第一次登入設定</h2>
+  <p class="hint">請先設定姓名並更換密碼。姓名完成設定後只能由管理員修改。</p>
+  <form id="setupForm">
+    <label>姓名<input id="setupName" maxlength="50" required autocomplete="name"></label>
+    <label>新密碼<input id="setupPassword" type="password" minlength="4" maxlength="64" required autocomplete="new-password" placeholder="至少 4 碼"></label>
+    <label>再次輸入新密碼<input id="setupPassword2" type="password" minlength="4" maxlength="64" required autocomplete="new-password"></label>
+    <button class="primary" type="submit">完成設定</button>
+  </form>
+</section>
+
+<div id="studentApp" class="hidden">
+  <section>
+    <div class="section-head"><h2>開放中的訂餐</h2><span id="menuCount"></span></div>
+    <label class="picker-label">選擇訂餐日期
+      <select id="sessionPicker" disabled><option>載入中…</option></select>
+    </label>
+    <div id="menus" class="menu-grid"><div class="loading">載入中…</div></div>
+  </section>
+</div>
+</main>
+
+<dialog id="orderDialog" class="form-dialog">
+  <form id="orderDialogForm">
+    <div class="dialog-head"><div><small id="orderDialogDate"></small><h2 id="orderDialogTitle">訂餐</h2></div><button type="button" class="close-dialog" data-close="orderDialog">×</button></div>
+    <div id="freeOrderFields">
+      <label>品項<input id="orderItem" maxlength="100" placeholder="例如：豬肉丼飯"></label>
+      <label>金額<input id="orderAmount" type="number" min="0" max="10000" step="1" inputmode="numeric"></label>
+    </div>
+    <div id="testOrderFields" class="hidden">
+      <div class="item-editor-head"><b>選擇品項</b><span class="hint">選完會自動增加下一格</span></div>
+      <div id="testOrderRows"></div>
+      <div class="selected-price">合計：<b id="selectedItemPrice">$0</b></div>
+    </div>
+    <label>備註<input id="orderNote" maxlength="300" placeholder="選填"></label>
+    <div class="dialog-actions"><button type="button" class="ghost" data-close="orderDialog">取消</button><button class="primary" type="submit">儲存訂單</button></div>
+  </form>
+</dialog>
+
+<dialog id="historyDialog" class="form-dialog history-dialog">
+  <div class="history-shell">
+    <div class="dialog-head"><div><small>MY ORDERS</small><h2>歷史訂單</h2></div><button type="button" class="close-dialog" data-close="historyDialog">×</button></div>
+    <div id="historyStats" class="history-stats">
+      <div><small>累計訂單</small><b id="historyCount">0</b></div>
+      <div><small>累計消費</small><b id="historyTotal">$0</b></div>
+      <div><small>已付款</small><b id="historyPaid">0</b></div>
+      <div><small>未付款</small><b id="historyUnpaid">0</b></div>
+    </div>
+    <div id="historyList" class="history-list"><div class="loading">載入中…</div></div>
+  </div>
+</dialog>
+
+<dialog id="accountDialog" class="form-dialog">
+  <form id="passwordForm">
+    <div class="dialog-head"><div><small>帳號設定</small><h2>修改密碼</h2></div><button type="button" class="close-dialog" data-close="accountDialog">×</button></div>
+    <p class="hint">座號與姓名不能自行修改；姓名如需更正請找管理員。</p>
+    <label>新密碼<input id="newPassword" type="password" minlength="4" maxlength="64" required autocomplete="new-password" placeholder="至少 4 碼"></label>
+    <label>再次輸入<input id="newPassword2" type="password" minlength="4" maxlength="64" required autocomplete="new-password"></label>
+    <div class="dialog-actions"><button type="button" class="ghost" data-close="accountDialog">取消</button><button class="primary" type="submit">更新密碼</button></div>
+  </form>
+</dialog>
+
+<div id="imageModal" class="modal hidden" onclick="closeImage(event)"><div class="image-viewer" onclick="event.stopPropagation()"><button type="button" class="close" onclick="closeImage()">×</button><img id="largeImage" alt="菜單大圖"></div></div>
+<div id="toast" class="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>window.APP_CONFIG={supabaseUrl:"https://roynzxilxumfzzuezelg.supabase.co",publishableKey:"sb_publishable_nvmHzVjH7bZ8F9cnJYzKCg_PSPlhCXU"};</script>
+<script src="pwa.js?v=20261003-03"></script>
+<script src="app.js?v=20261003-07"></script>
+</body></html>
