@@ -4,6 +4,14 @@ const $=id=>document.getElementById(id);
 let student=null,sessions=[],orders=[],menuItems=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,realtimeChannel=null,realtimeTimer=null,deferredInstallPrompt=null,notificationPermissionStatus=null,pushPermissionSyncing=false;
 const money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
 const PUSH_VAPID_PUBLIC_KEY='BIfooHITgKhbwNm9ufy7fUdoyaU46cxxSFFoAOPQrKHJ4RPHzsqYQb9CEMWflB4PlXmpyptPHWl-fvgiWjeW_kE';
+const PUSH_DEVICE_OPT_IN_KEY='class-lunch-push-device-opt-in-v1';
+function devicePushOptedIn(){return localStorage.getItem(PUSH_DEVICE_OPT_IN_KEY)==='1'}
+function setDevicePushOptIn(enabled){localStorage.setItem(PUSH_DEVICE_OPT_IN_KEY,enabled?'1':'0')}
+async function initializeDevicePushPreference(){
+  if(localStorage.getItem(PUSH_DEVICE_OPT_IN_KEY)!==null)return;
+  const sub=await getCurrentPushSubscription();
+  setDevicePushOptIn(!!sub);
+}
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
@@ -212,7 +220,7 @@ async function upsertCurrentPushSubscription(subscription){
   if(data?.error)throw new Error(data.error);
 }
 async function syncPushAfterPermissionGranted(showToast=true){
-  if(pushPermissionSyncing||Notification.permission!=='granted')return;
+  if(pushPermissionSyncing||Notification.permission!=='granted'||!devicePushOptedIn())return;
   pushPermissionSyncing=true;
   try{
     const reg=await getPushRegistration();
@@ -238,14 +246,15 @@ async function syncPushAfterPermissionGranted(showToast=true){
 async function watchNotificationPermission(){
   if(!('permissions' in navigator)||!('Notification' in window))return;
   try{
+    await initializeDevicePushPreference();
     notificationPermissionStatus=await navigator.permissions.query({name:'notifications'});
     notificationPermissionStatus.onchange=async()=>{
       await refreshPushStatus();
-      if(notificationPermissionStatus.state==='granted'){
+      if(notificationPermissionStatus.state==='granted'&&devicePushOptedIn()){
         await syncPushAfterPermissionGranted(true);
       }
     };
-    if(notificationPermissionStatus.state==='granted'){
+    if(notificationPermissionStatus.state==='granted'&&devicePushOptedIn()){
       await syncPushAfterPermissionGranted(false);
     }
   }catch(error){
@@ -259,9 +268,10 @@ async function refreshPushStatus(){
     status.textContent='此瀏覽器不支援系統推播通知。';
     enable.disabled=true;disable.classList.add('hidden');return;
   }
+  await initializeDevicePushPreference();
   const sub=await getCurrentPushSubscription();
-  if(Notification.permission==='granted'&&sub){
-    status.textContent='通知已開啟。';
+  if(Notification.permission==='granted'&&sub&&devicePushOptedIn()){
+    status.textContent='通知已開啟（僅此裝置）。';
     enable.classList.add('hidden');disable.classList.remove('hidden');
     try{await upsertCurrentPushSubscription(sub)}catch(error){console.warn('push_sync_failed',error)}
     return;
@@ -282,9 +292,9 @@ async function enablePushNotifications(){
     await refreshPushStatus();
     if(permission==='default'){
       const status=$('pushStatusText');
-      const msg='Chrome 尚未取得決定。請點網址列左邊的網站控制圖示 → 通知 → 允許；允許後會自動完成設定。';
+      const msg='Chrome 尚未取得決定。請點網址列左邊的網站控制圖示 → 通知 → 允許，再回來按一次「開啟通知」。';
       if(status)status.textContent=msg;
-      return toast('請從網址列左邊的網站控制開啟通知');
+      return toast('請允許通知後，再按一次開啟通知');
     }
     return toast('通知已被封鎖，請到網站權限重新允許');
   }
@@ -299,8 +309,9 @@ async function enablePushNotifications(){
       });
     }
     await upsertCurrentPushSubscription(sub);
+    setDevicePushOptIn(true);
     await refreshPushStatus();
-    toast('訂餐通知已開啟');
+    toast('此裝置的訂餐通知已開啟');
   }catch(error){
     console.error('push_enable_failed',error);
     const status=$('pushStatusText');
@@ -319,22 +330,30 @@ async function enablePushNotifications(){
   }
 }
 async function disablePushNotifications(){
+  setDevicePushOptIn(false);
+  let cleanupFailed=false;
   try{
     const sub=await getCurrentPushSubscription();
     if(sub){
-      const{data,error}=await db.functions.invoke('class-lunch-push',{body:{
-        action:'unsubscribe',
-        endpoint:sub.endpoint
-      }});
-      if(error)throw error;
-      if(data?.error)throw new Error(data.error);
-      await sub.unsubscribe();
+      try{
+        const{data,error}=await db.functions.invoke('class-lunch-push',{body:{
+          action:'unsubscribe',
+          endpoint:sub.endpoint
+        }});
+        if(error)throw error;
+        if(data?.error)throw new Error(data.error);
+      }catch(error){
+        cleanupFailed=true;
+        console.warn('push_server_unsubscribe_failed',error);
+      }
+      try{await sub.unsubscribe()}catch(error){console.warn('push_local_unsubscribe_failed',error)}
     }
     await refreshPushStatus();
-    toast('訂餐通知已關閉');
+    toast(cleanupFailed?'此裝置通知已關閉；伺服器資料稍後會自動清理':'此裝置的訂餐通知已關閉');
   }catch(error){
     console.error(error);
-    toast('關閉通知失敗');
+    await refreshPushStatus();
+    toast('此裝置已設為不接收通知');
   }
 }
 async function detachPushBeforeLogout(){
