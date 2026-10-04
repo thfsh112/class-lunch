@@ -1,19 +1,19 @@
-const STATIC_CACHE="class-lunch-static-v20261004-63";
+const STATIC_CACHE="class-lunch-static-v20261005-64";
 const IMAGE_CACHE="class-lunch-menu-images-v1";
 
 const APP_SHELL=[
   "./",
   "./index.html",
   "./admin.html",
-  "./style.css?v=20261004-63",
-  "./app.js?v=20261004-63",
-  "./admin.js?v=20261004-63",
-  "./pwa.js?v=20261004-63",
-  "./manifest.webmanifest?v=20261004-63",
-  "./icon-192.png?v=20261004-63",
-  "./icon-512.png?v=20261004-63",
-  "./notification-icon.png?v=20261004-63",
-  "./notification-badge.png?v=20261004-63"
+  "./style.css?v=20261005-64",
+  "./app.js?v=20261005-64",
+  "./admin.js?v=20261005-64",
+  "./pwa.js?v=20261005-64",
+  "./manifest.webmanifest?v=20261005-64",
+  "./icon-192.png?v=20261005-64",
+  "./icon-512.png?v=20261005-64",
+  "./notification-icon.png?v=20261005-64",
+  "./notification-badge.png?v=20261005-64"
 ];
 
 self.addEventListener("install",event=>{
@@ -71,6 +71,11 @@ self.addEventListener("fetch",event=>{
   const url=new URL(event.request.url);
   if(url.origin!==self.location.origin)return;
 
+  if(url.pathname.endsWith("/version.json")){
+    event.respondWith(fetch(event.request,{cache:"no-store"}));
+    return;
+  }
+
   if(event.request.mode==="navigate"){
     event.respondWith(
       fetch(event.request).then(response=>{
@@ -112,8 +117,8 @@ self.addEventListener("push",event=>{
   event.waitUntil(
     self.registration.showNotification(payload.title||"班級訂飯",{
       body:payload.body||"訂餐有新通知",
-      icon:"./notification-icon.png?v=20261004-63",
-      badge:"./notification-badge.png?v=20261004-63",
+      icon:"./notification-icon.png?v=20261005-64",
+      badge:"./notification-badge.png?v=20261005-64",
       tag:payload.tag||"class-lunch-notice",
       renotify:true,
       data:payload.data||{url:"https://thfsh112.github.io/class-lunch/"}

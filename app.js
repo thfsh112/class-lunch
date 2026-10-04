@@ -14,6 +14,54 @@ async function initializeDevicePushPreference(){
 }
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+function compareAppVersions(a,b){
+  const aa=String(a||'').split('.').map(n=>Number(n)||0),bb=String(b||'').split('.').map(n=>Number(n)||0);
+  const len=Math.max(aa.length,bb.length);
+  for(let i=0;i<len;i++){
+    const diff=(aa[i]||0)-(bb[i]||0);
+    if(diff)return diff;
+  }
+  return 0;
+}
+async function getLatestAppVersion(){
+  const url='./version.json?_='+Date.now();
+  const response=await fetch(url,{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
+  if(!response.ok)throw new Error('version_check_http_'+response.status);
+  const data=await response.json();
+  const version=String(data?.version||'').trim();
+  if(!/^\d+(?:\.\d+)*$/.test(version))throw new Error('version_check_invalid');
+  return version;
+}
+function showVersionOutdatedDialog(currentVersion,latestVersion){
+  const current=$('versionCurrent'),latest=$('versionLatest'),dialog=$('versionOutdatedDialog');
+  if(current)current.textContent=currentVersion||'—';
+  if(latest)latest.textContent=latestVersion||'—';
+  if(dialog&&!dialog.open)dialog.showModal();
+}
+async function ensureLatestVersionBeforeOrdering(){
+  const currentVersion=String(window.CLASS_LUNCH_APP_VERSION||'').trim();
+  if(!currentVersion)return true;
+  try{
+    const latestVersion=await getLatestAppVersion();
+    if(compareAppVersions(currentVersion,latestVersion)>=0)return true;
+    showVersionOutdatedDialog(currentVersion,latestVersion);
+    return false;
+  }catch(error){
+    console.warn('class_lunch_version_check_failed',error);
+    return true;
+  }
+}
+$('updateNowBtn')?.addEventListener('click',()=>{
+  const btn=$('updateNowBtn');
+  if(typeof window.forceClassLunchUpdate==='function'){
+    window.forceClassLunchUpdate(btn);
+    return;
+  }
+  if(btn){btn.disabled=true;btn.textContent='更新中…';}
+  const u=new URL(location.href);
+  u.searchParams.set('_refresh',Date.now().toString());
+  location.replace(u.href);
+});
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
 function fmtDate(v){const d=new Date(v+'T00:00:00');return d.toLocaleDateString('zh-TW',{month:'numeric',day:'numeric',weekday:'short'})}
 function fmtCutoff(v){if(!v)return'';return new Date(v).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}
@@ -634,7 +682,8 @@ function removeTestOrderSelection(i){
   testSelections.splice(i,1);
   renderTestOrderRows();
 }
-function openOrderEditor(sessionId){
+async function openOrderEditor(sessionId){
+  if(!(await ensureLatestVersionBeforeOrdering()))return;
   const s=sessions.find(x=>x.id===sessionId),o=orders.find(x=>x.meal_session_id===sessionId);
   if(!s||expired(s)||o?.paid)return;
   editingSessionId=sessionId;$('orderDialogTitle').textContent=s.menu_templates?.name||'訂餐';$('orderDialogDate').textContent=fmtDate(s.meal_date);$('orderNote').value=o?.note||'';
