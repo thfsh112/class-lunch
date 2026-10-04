@@ -1,8 +1,8 @@
 let latestOverviewCopyText='',latestUnpaidCopyText='';
 const{createClient}=supabase;
-const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'class-lunch-admin-auth'}});
-const legacyDb=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:false,detectSessionInUrl:false,storage:window.localStorage,storageKey:'class-lunch-user-auth'}});
-let legacyAdminChecked=false,adminGatePassed=localStorage.getItem('class-lunch-admin-gate')==='1';
+const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage,storageKey:'class-lunch-user-auth'}});
+const legacyDb=db;
+let adminGatePassed=localStorage.getItem('class-lunch-admin-gate')==='1';
 const $=id=>document.getElementById(id),money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -28,13 +28,6 @@ $('loginForm').addEventListener('submit',async e=>{
     .maybeSingle();
   if(selfError||!self||!self.active||self.seat_number!==99)return toast('管理頁只開放 99 號');
 
-  localStorage.removeItem('class-lunch-admin-no-legacy-migrate');
-  const{error:setError}=await db.auth.setSession({
-    access_token:session.access_token,
-    refresh_token:session.refresh_token
-  });
-  if(setError)return toast('管理登入失敗：'+setError.message);
-
   const{data,error}=await db.functions.invoke('class-lunch-admin-login',{body:{username,password}});
   if(error||data?.error){
     adminGatePassed=false;
@@ -49,8 +42,7 @@ $('loginForm').addEventListener('submit',async e=>{
 $('logoutBtn').addEventListener('click',async()=>{
   adminGatePassed=false;
   localStorage.removeItem('class-lunch-admin-gate');
-  localStorage.setItem('class-lunch-admin-no-legacy-migrate','1');
-  await db.auth.signOut();
+  await db.auth.signOut({scope:'local'});
   refresh();
 });
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>$(b.dataset.close).close()));
@@ -75,20 +67,7 @@ document.querySelectorAll('[data-admin-group]').forEach(b=>b.addEventListener('c
   await openAdminTab(group==='orders'?'overview':'students');
 }));
 
-async function migrateLegacyAdminSession(){
-  if(legacyAdminChecked)return;
-  legacyAdminChecked=true;
-  if(localStorage.getItem('class-lunch-admin-no-legacy-migrate')==='1')return;
-  const{data:{session:current}}=await db.auth.getSession();
-  if(current)return;
-  const{data:{session:legacy}}=await legacyDb.auth.getSession();
-  if(!legacy?.user?.email)return;
-  const{data:legacyAdmin}=await legacyDb.from('admin_users').select('email').eq('email',legacy.user.email).maybeSingle();
-  if(!legacyAdmin)return;
-  await db.auth.setSession({access_token:legacy.access_token,refresh_token:legacy.refresh_token});
-}
 async function refresh(){
-  await migrateLegacyAdminSession();
   const adminIdentity=await isAdmin();
   const ok=adminIdentity&&adminGatePassed;
   $('loginBox').classList.toggle('hidden',ok);
