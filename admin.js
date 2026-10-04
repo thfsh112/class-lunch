@@ -100,11 +100,11 @@ async function refresh(){
   if($('backupDate')&&!$('backupDate').value)$('backupDate').value=today();
   applyDefaultSessionCutoff(true);
   await Promise.all([loadTemplates(),loadSessions(),loadStudents()]);
-  renderTemplateSelect();renderSessionList();renderStudentList();renderOverviewSelect();renderInitStatus();
+  renderTemplateSelect();renderSessionList();renderStudentList();renderOverviewSelect();
 }
 async function loadTemplates(){const{data,error}=await db.from('menu_templates').select('*').order('created_at',{ascending:false});if(error)return toast(error.message);templates=data||[];$('templateCount').textContent=templates.length+' 份';renderTemplateList()}
 async function loadSessions(){const{data,error}=await db.from('meal_sessions').select('*,menu_templates(name,image_url)').order('meal_date',{ascending:false}).order('created_at',{ascending:false});if(error)return toast(error.message);sessions=data||[];$('sessionCount').textContent=sessions.length+' 個';renderSessionList();renderOverviewSelect()}
-async function loadStudents(){const{data,error}=await db.from('students').select('id,auth_user_id,seat_number,name,active,must_setup,created_at').order('seat_number');if(error)return toast(error.message);students=data||[];$('studentCount').textContent=students.length+' 人';renderStudentList();renderInitStatus()}
+async function loadStudents(){const{data,error}=await db.from('students').select('id,auth_user_id,seat_number,name,active,must_setup,created_at').order('seat_number');if(error)return toast(error.message);students=data||[];$('studentCount').textContent=students.length+' 人';renderStudentList()}
 
 function renderTemplateSelect(){
   $('sessionTemplate').innerHTML=templates.filter(t=>t.active).map(t=>'<option value="'+t.id+'">'+esc(t.name)+'</option>').join('');
@@ -113,24 +113,6 @@ function renderTemplateSelect(){
 function renderTemplateList(){$('templateList').innerHTML=templates.map(t=>'<div class="admin-item">'+(t.image_url?'<img src="'+esc(t.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(t.name)+'</b><br><span class="hint">'+(t.active?'使用中':'已停用')+'</span></div><div class="actions"><button class="small-btn" onclick="openTemplateDialog('+t.id+')">編輯</button></div></div>').join('')||'<div class="loading">尚無菜單</div>'}
 function renderSessionList(){$('sessionList').innerHTML=sessions.map(s=>'<div class="admin-item">'+(s.menu_templates?.image_url?'<img src="'+esc(s.menu_templates.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(s.menu_templates?.name||'菜單')+'</b><br>'+esc(s.meal_date)+(s.cutoff_at?' · 截止 '+esc(new Date(s.cutoff_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):'')+'<br><span class="hint">'+(s.is_active?'開放':'關閉')+'</span></div><div class="actions"><button class="small-btn" onclick="openSessionDialog('+s.id+')">編輯</button></div></div>').join('')||'<div class="loading">尚無日期</div>'}
 function renderStudentList(){$('studentList').innerHTML=students.map(s=>'<div class="student-row"><span class="seat-badge">'+s.seat_number+'號</span><div><b>'+esc(s.name||'尚未設定姓名')+'</b><br><span class="hint">'+(s.auth_user_id?'帳號已建立':'尚未初始化')+' · '+(s.active?'啟用中':'已停用')+(s.must_setup?' · 待首次設定':'')+'</span></div><div class="actions"><button class="small-btn" onclick="openStudentDialog(\''+s.id+'\')">編輯</button></div></div>').join('')||'<div class="loading">尚無學生</div>'}
-function renderInitStatus(){
-  if(!$('initStatus'))return;
-  const managed=students.filter(s=>s.seat_number!==0),linked=managed.filter(s=>s.auth_user_id).length;
-  $('initStatus').textContent='學生 Auth 帳號 '+linked+' / '+managed.length+' 已建立；老師帳號首次用 tch 登入時建立';
-  $('initStudentsBtn').disabled=managed.length>0&&linked===managed.length;
-  $('initStudentsBtn').textContent=linked===managed.length?'學生帳號已完成':'初始化學生帳號';
-}
-
-$('initStudentsBtn').addEventListener('click',async()=>{
-  if(!confirm('確定建立／補齊 1～35 與 99 的學生登入帳號？此動作只需執行一次。'))return;
-  const b=$('initStudentsBtn');b.disabled=true;b.textContent='初始化中…';
-  const{data,error}=await db.functions.invoke('class-lunch-students',{body:{action:'seed_defaults'}});
-  if(error||data?.error){b.disabled=false;b.textContent='重新初始化';return toast('初始化失敗：'+(data?.detail||data?.error||error.message))}
-  const failed=(data?.results||[]).filter(x=>!x.ok);
-  if(failed.length){b.disabled=false;b.textContent='重新初始化';toast('仍有 '+failed.length+' 個帳號未完成')}else toast('學生帳號初始化完成');
-  await loadStudents();
-});
-
 $('templateForm').addEventListener('submit',async e=>{
   e.preventDefault();const f=$('templateImage').files[0],name=$('templateName').value.trim();if(!f||!name)return;if(f.size>6*1024*1024)return toast('圖片請小於 6MB');
   const url=await uploadMenuImage(f);if(!url)return;const{error}=await db.from('menu_templates').insert({name,image_url:url,active:true});if(error)return toast(error.message);
