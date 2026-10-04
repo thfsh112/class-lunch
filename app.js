@@ -271,7 +271,9 @@ async function refreshPushStatus(){
   await initializeDevicePushPreference();
   const sub=await getCurrentPushSubscription();
   if(Notification.permission==='granted'&&sub&&devicePushOptedIn()){
-    status.textContent='通知已開啟（僅此裝置）。';
+    status.textContent=student?.seat_number===99
+      ?'通知已開啟（目前登入 99，此裝置會接收推播）。'
+      :'此裝置通知已開啟；只有目前登入 99 時才會接收訂餐推播。';
     enable.classList.add('hidden');disable.classList.remove('hidden');
     try{await upsertCurrentPushSubscription(sub)}catch(error){console.warn('push_sync_failed',error)}
     return;
@@ -356,8 +358,23 @@ async function disablePushNotifications(){
     toast('此裝置已設為不接收通知');
   }
 }
+async function detachCurrentPushBinding(){
+  try{
+    const sub=await getCurrentPushSubscription();
+    if(!sub)return;
+    const{data,error}=await db.functions.invoke('class-lunch-push',{body:{
+      action:'detach',
+      endpoint:sub.endpoint
+    }});
+    if(error)throw error;
+    if(data?.error)throw new Error(data.error);
+  }catch(error){
+    console.warn('push_binding_detach_failed',error);
+  }
+}
 async function detachPushBeforeLogout(){
-  // 通知以裝置為單位；登出不取消這支裝置的推播訂閱。
+  // 保留瀏覽器通知權限與本機開關，只解除「目前登入 99」的後端收件綁定。
+  await detachCurrentPushBinding();
 }
 async function openAccountDialog(){
   $('passwordForm').reset();
@@ -475,6 +492,7 @@ async function refresh(){
   if(!session){
     stopStudentRealtime();
     student=null;
+    detachCurrentPushBinding();
     $('loginBox').classList.remove('hidden');$('setupBox').classList.add('hidden');$('studentApp').classList.add('hidden');
     $('heroAccount').classList.add('hidden');$('logoutBtn').classList.add('hidden');$('notifyBtn').classList.add('hidden');$('accountBtn').classList.add('hidden');$('historyBtn').classList.add('hidden');$('adminLink').classList.add('hidden');
     $('welcomeText').textContent='登入後查看開放中的訂餐。';return;
