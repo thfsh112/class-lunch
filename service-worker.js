@@ -1,19 +1,19 @@
-const STATIC_CACHE="class-lunch-static-v20261005-64";
+const STATIC_CACHE="class-lunch-static-v20261005-65";
 const IMAGE_CACHE="class-lunch-menu-images-v1";
 
 const APP_SHELL=[
   "./",
   "./index.html",
   "./admin.html",
-  "./style.css?v=20261005-64",
-  "./app.js?v=20261005-64",
-  "./admin.js?v=20261005-64",
-  "./pwa.js?v=20261005-64",
-  "./manifest.webmanifest?v=20261005-64",
-  "./icon-192.png?v=20261005-64",
-  "./icon-512.png?v=20261005-64",
-  "./notification-icon.png?v=20261005-64",
-  "./notification-badge.png?v=20261005-64"
+  "./style.css?v=20261005-65",
+  "./app.js?v=20261005-65",
+  "./admin.js?v=20261005-65",
+  "./pwa.js?v=20261005-65",
+  "./manifest.webmanifest?v=20261005-65",
+  "./icon-192.png?v=20261005-65",
+  "./icon-512.png?v=20261005-65",
+  "./notification-icon.png?v=20261005-65",
+  "./notification-badge.png?v=20261005-65"
 ];
 
 self.addEventListener("install",event=>{
@@ -26,15 +26,27 @@ self.addEventListener("install",event=>{
 });
 
 self.addEventListener("activate",event=>{
-  event.waitUntil(
-    caches.keys()
-      .then(keys=>Promise.all(
-        keys
-          .filter(key=>key.startsWith("class-lunch-")&&key!==STATIC_CACHE&&key!==IMAGE_CACHE)
-          .map(key=>caches.delete(key))
-      ))
-      .then(()=>self.clients.claim())
-  );
+  event.waitUntil((async()=>{
+    const keys=await caches.keys();
+    await Promise.all(
+      keys
+        .filter(key=>key.startsWith("class-lunch-")&&key!==STATIC_CACHE&&key!==IMAGE_CACHE)
+        .map(key=>caches.delete(key))
+    );
+    await self.clients.claim();
+
+    const windows=await self.clients.matchAll({type:"window",includeUncontrolled:true});
+    await Promise.all(windows.map(client=>{
+      try{
+        const u=new URL(client.url);
+        if(u.origin!==self.location.origin||!u.pathname.startsWith("/class-lunch/"))return null;
+        u.searchParams.set("_sw_refresh",Date.now().toString());
+        return client.navigate(u.href).catch(()=>null);
+      }catch{
+        return null;
+      }
+    }));
+  })());
 });
 
 function isMenuImage(request){
@@ -117,8 +129,8 @@ self.addEventListener("push",event=>{
   event.waitUntil(
     self.registration.showNotification(payload.title||"班級訂飯",{
       body:payload.body||"訂餐有新通知",
-      icon:"./notification-icon.png?v=20261005-64",
-      badge:"./notification-badge.png?v=20261005-64",
+      icon:"./notification-icon.png?v=20261005-65",
+      badge:"./notification-badge.png?v=20261005-65",
       tag:payload.tag||"class-lunch-notice",
       renotify:true,
       data:payload.data||{url:"https://thfsh112.github.io/class-lunch/"}
