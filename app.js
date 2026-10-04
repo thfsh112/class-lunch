@@ -386,7 +386,13 @@ $('loginForm').addEventListener('submit',async e=>{
 
   const seat=Number(account);
   if(!validSeat(seat))return toast('帳號不正確');
-  if(seat===99&&raw!=='099')return toast('座號或密碼錯誤');
+  if(seat===99){
+    if(raw!=='099')return toast('座號或密碼錯誤');
+    const{error}=await db.auth.signInWithPassword({email:internalEmail(99),password:authPassword('099')});
+    if(error)return toast('座號或密碼錯誤');
+    $('passwordLogin').value='';
+    return refresh();
+  }
   if(raw===String(seat).padStart(3,'0')){
     const{data:initData,error:initError}=await db.functions.invoke('class-lunch-init-login',{body:{seat_number:seat,initial_code:raw}});
     if(initError||initData?.error)return toast('初始登入失敗：'+(initData?.detail||initData?.error||initError?.message||'未知錯誤'));
@@ -419,7 +425,7 @@ $('setupForm').addEventListener('submit',async e=>{
   $('setupForm').reset();toast('設定完成');await refresh();
 });
 
-$('logoutBtn').addEventListener('click',async()=>{localStorage.removeItem('class-lunch-admin-gate');await detachPushBeforeLogout();await db.auth.signOut();student=null;refresh()});
+$('logoutBtn').addEventListener('click',async()=>{localStorage.removeItem('class-lunch-admin-gate');await detachPushBeforeLogout();await db.auth.signOut({scope:'local'});student=null;refresh()});
 $('accountBtn').addEventListener('click',openAccountDialog);
 $('notifyBtn').addEventListener('click',openAccountDialog);
 $('enablePushBtn').addEventListener('click',enablePushNotifications);
