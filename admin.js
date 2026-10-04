@@ -250,45 +250,10 @@ $('ocrMenuBtn').addEventListener('click',async()=>{
   }catch(err){toast('OCR 失敗：'+(err?.message||err))}
   finally{b.disabled=false;b.textContent='辨識菜單';$('ocrProgress').textContent='';}
 });
-async function syncMenuPriceChangesToOrders(changedRows){
-  const rows=(changedRows||[]).filter(x=>x?.id);
-  if(!rows.length)return 0;
-  const itemIds=rows.map(x=>Number(x.id));
-  const{data:refs,error:refError}=await db.from('order_items')
-    .select('id,order_id,menu_item_id')
-    .in('menu_item_id',itemIds);
-  if(refError)throw new Error('讀取受影響訂單失敗：'+refError.message);
-
-  for(const row of rows){
-    const patch=row.is_market_price
-      ?{unit_price:0,is_market_price:true}
-      :{unit_price:Number(row.price||0),is_market_price:false,market_price_amount:null};
-    const{error}=await db.from('order_items').update(patch).eq('menu_item_id',row.id);
-    if(error)throw new Error('同步訂單品項價格失敗：'+error.message);
-  }
-
-  const orderIds=[...new Set((refs||[]).map(x=>Number(x.order_id)).filter(Number.isFinite))];
-  if(!orderIds.length)return 0;
-
-  const{data:items,error:itemsError}=await db.from('order_items')
-    .select('order_id,quantity,unit_price,is_market_price,market_price_amount')
-    .in('order_id',orderIds);
-  if(itemsError)throw new Error('重新計算訂單失敗：'+itemsError.message);
-
-  const totals=new Map(orderIds.map(id=>[id,0]));
-  for(const item of (items||[])){
-    const qty=Number(item.quantity||1);
-    const unit=item.is_market_price
-      ?Number(item.market_price_amount||0)
-      :Number(item.unit_price||0);
-    totals.set(Number(item.order_id),(totals.get(Number(item.order_id))||0)+unit*qty);
-  }
-
-  for(const [orderId,total] of totals){
-    const{error}=await db.from('orders').update({unit_price:total}).eq('id',orderId);
-    if(error)throw new Error('更新整張訂單金額失敗：'+error.message);
-  }
-  return orderIds.length;
+async function syncMenuPriceChangesToOrders(menuTemplateId){
+  const{data,error}=await db.rpc('sync_class_lunch_menu_prices',{p_menu_template_id:menuTemplateId});
+  if(error)throw new Error('同步既有訂單金額失敗：'+error.message);
+  return Number(data?.orders_updated||0);
 }
 
 $('templateEditForm').addEventListener('submit',async e=>{
@@ -347,7 +312,7 @@ $('templateEditForm').addEventListener('submit',async e=>{
   let affectedOrders=0;
   if(priceChangedRows.length){
     try{
-      affectedOrders=await syncMenuPriceChangesToOrders(priceChangedRows);
+      affectedOrders=await syncMenuPriceChangesToOrders(editingTemplateId);
     }catch(error){
       return toast(error?.message||String(error));
     }
