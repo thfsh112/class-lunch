@@ -389,8 +389,10 @@ async function loadHistoryOrders(){
     const paid=rows.filter(o=>o.paid).length;
     const total=rows.reduce((sum,o)=>sum+Number(o.unit_price||0)*Number(o.quantity||1),0);
     const body=rows.length?rows.slice().sort((a,b)=>{
-      const sa=students.find(x=>x.id===a.student_id)?.seat_number??Number(a.student_name)||999;
-      const sb=students.find(x=>x.id===b.student_id)?.seat_number??Number(b.student_name)||999;
+      const aSeat=students.find(x=>x.id===a.student_id)?.seat_number;
+      const bSeat=students.find(x=>x.id===b.student_id)?.seat_number;
+      const sa=aSeat??(Number.isFinite(Number(a.student_name))?Number(a.student_name):999);
+      const sb=bSeat??(Number.isFinite(Number(b.student_name))?Number(b.student_name):999);
       return Number(sa)-Number(sb);
     }).map(o=>{
       const st=students.find(x=>x.id===o.student_id);
