@@ -55,6 +55,7 @@ async function openAdminTab(tab){
   $('tab-'+tab)?.classList.remove('hidden');
   if(tab==='logs')await loadLogs();
   if(tab==='changes')await loadOrderChanges();
+  if(tab==='history')await loadHistoryOrders();
   if(tab==='backups')await loadBackups();
 }
 
@@ -82,7 +83,7 @@ async function refresh(){
   renderTemplateSelect();renderSessionList();renderStudentList();renderOverviewSelect();
 }
 async function loadTemplates(){const{data,error}=await db.from('menu_templates').select('*').order('created_at',{ascending:false});if(error)return toast(error.message);templates=data||[];$('templateCount').textContent=templates.length+' 份';renderTemplateList()}
-async function loadSessions(){const{data,error}=await db.from('meal_sessions').select('*,menu_templates(name,image_url)').order('meal_date',{ascending:false}).order('created_at',{ascending:false});if(error)return toast(error.message);sessions=data||[];$('sessionCount').textContent=sessions.length+' 個';renderSessionList();renderOverviewSelect()}
+async function loadSessions(){const{data,error}=await db.from('meal_sessions').select('*,menu_templates(name,image_url)').order('meal_date',{ascending:false}).order('created_at',{ascending:false});if(error)return toast(error.message);sessions=data||[];renderSessionList();renderOverviewSelect();if(!$('tab-history')?.classList.contains('hidden'))loadHistoryOrders()}
 async function loadStudents(){const{data,error}=await db.from('students').select('id,auth_user_id,seat_number,name,active,must_setup,created_at').order('seat_number');if(error)return toast(error.message);students=data||[];$('studentCount').textContent=students.length+' 人';renderStudentList()}
 
 function renderTemplateSelect(){
@@ -90,7 +91,11 @@ function renderTemplateSelect(){
   $('editSessionTemplate').innerHTML=templates.map(t=>'<option value="'+t.id+'">'+esc(t.name)+(t.active?'':'（停用）')+'</option>').join('');
 }
 function renderTemplateList(){$('templateList').innerHTML=templates.map(t=>'<div class="admin-item">'+(t.image_url?'<img src="'+esc(t.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(t.name)+'</b><br><span class="hint">'+(t.active?'使用中':'已停用')+'</span></div><div class="actions"><button class="small-btn" onclick="openTemplateDialog('+t.id+')">編輯</button></div></div>').join('')||'<div class="loading">尚無菜單</div>'}
-function renderSessionList(){$('sessionList').innerHTML=sessions.map(s=>'<div class="admin-item">'+(s.menu_templates?.image_url?'<img src="'+esc(s.menu_templates.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(s.menu_templates?.name||'菜單')+'</b><br>'+esc(s.meal_date)+(s.cutoff_at?' · 截止 '+esc(new Date(s.cutoff_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):'')+'<br><span class="hint">'+(s.is_active?'開放':'關閉')+'</span></div><div class="actions"><button class="small-btn" onclick="openSessionDialog('+s.id+')">編輯</button></div></div>').join('')||'<div class="loading">尚無日期</div>'}
+function renderSessionList(){
+  const current=sessions.filter(s=>s.meal_date>=today()).sort((a,b)=>a.meal_date.localeCompare(b.meal_date)||Number(a.id)-Number(b.id));
+  $('sessionCount').textContent=current.length+' 個';
+  $('sessionList').innerHTML=current.map(s=>'<div class="admin-item">'+(s.menu_templates?.image_url?'<img src="'+esc(s.menu_templates.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(s.menu_templates?.name||'菜單')+'</b><br>'+esc(s.meal_date)+(s.cutoff_at?' · 截止 '+esc(new Date(s.cutoff_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):'')+'<br><span class="hint">'+(s.is_active?'開放':'關閉')+'</span></div><div class="actions"><button class="small-btn" onclick="openSessionDialog('+s.id+')">編輯</button></div></div>').join('')||'<div class="loading">今天起沒有訂餐日期</div>';
+}
 function renderStudentList(){$('studentList').innerHTML=students.map(s=>'<div class="student-row"><span class="seat-badge">'+s.seat_number+'號</span><div><b>'+esc(s.name||'尚未設定姓名')+'</b><br><span class="hint">'+(s.auth_user_id?'帳號已建立':'尚未初始化')+' · '+(s.active?'啟用中':'已停用')+(s.must_setup?' · 待首次設定':'')+'</span></div><div class="actions"><button class="small-btn" onclick="openStudentDialog(\''+s.id+'\')">編輯</button></div></div>').join('')||'<div class="loading">尚無學生</div>'}
 $('templateForm').addEventListener('submit',async e=>{
   e.preventDefault();const f=$('templateImage').files[0],name=$('templateName').value.trim();if(!f||!name)return;if(f.size>6*1024*1024)return toast('圖片請小於 6MB');
@@ -347,7 +352,56 @@ $('studentEditForm').addEventListener('submit',async e=>{
   $('studentDialog').close();toast('學生資料已更新');await loadStudents();
 });
 
-function renderOverviewSelect(){const cur=$('overviewSession').value;$('overviewSession').innerHTML=sessions.map(s=>'<option value="'+s.id+'">'+esc(s.meal_date+' '+(s.menu_templates?.name||'菜單'))+'</option>').join('');if(cur&&sessions.some(s=>String(s.id)===cur))$('overviewSession').value=cur;$('overviewSession').onchange=loadOverview;if(sessions.length)loadOverview();else $('seatPayments').innerHTML='<div class="loading">尚無訂餐日期</div>'}
+function renderOverviewSelect(){
+  const sel=$('overviewSession'),cur=sel.value;
+  const current=sessions.filter(s=>s.meal_date>=today()).sort((a,b)=>a.meal_date.localeCompare(b.meal_date)||Number(a.id)-Number(b.id));
+  sel.innerHTML=current.map(s=>'<option value="'+s.id+'">'+esc(s.meal_date+' '+(s.menu_templates?.name||'菜單'))+'</option>').join('');
+  if(cur&&current.some(s=>String(s.id)===cur))sel.value=cur;
+  else if(current.length)sel.value=String(current[0].id);
+  sel.onchange=loadOverview;
+  if(current.length)loadOverview();
+  else{
+    $('statOrders').textContent='0';$('statPaid').textContent='0';$('statUnpaidCount').textContent='0';$('statTotal').textContent='$0';
+    $('itemStats').innerHTML='<div class="loading">今天起沒有訂餐日期</div>';
+    $('unpaidSummary').innerHTML='';
+    $('seatPayments').innerHTML='<div class="loading">今天起沒有訂餐日期</div>';
+  }
+}
+
+async function loadHistoryOrders(){
+  const box=$('historyOrderList'),count=$('historySessionCount');
+  if(!box||!count)return;
+  const past=sessions.filter(s=>s.meal_date<today()).sort((a,b)=>b.meal_date.localeCompare(a.meal_date)||Number(b.id)-Number(a.id));
+  count.textContent=past.length+' 個日期';
+  if(!past.length){box.innerHTML='<div class="loading">目前還沒有歷史訂單</div>';return}
+  box.innerHTML='<div class="loading">整理歷史訂單…</div>';
+  const packs=await Promise.all(past.map(async s=>{
+    const legacy=s.legacy_menu_id||-1;
+    const{data,error}=await db.from('orders')
+      .select('id,student_id,student_name,item_name,unit_price,note,paid,quantity')
+      .or('meal_session_id.eq.'+s.id+',menu_id.eq.'+legacy);
+    return {session:s,orders:data||[],error};
+  }));
+  box.innerHTML=packs.map(pack=>{
+    const s=pack.session;
+    if(pack.error)return '<details class="history-pack"><summary><span><b>'+esc(s.meal_date+' '+(s.menu_templates?.name||'菜單'))+'</b><small>讀取失敗</small></span></summary><div class="loading">'+esc(pack.error.message||'讀取失敗')+'</div></details>';
+    const rows=pack.orders;
+    const paid=rows.filter(o=>o.paid).length;
+    const total=rows.reduce((sum,o)=>sum+Number(o.unit_price||0)*Number(o.quantity||1),0);
+    const body=rows.length?rows.slice().sort((a,b)=>{
+      const sa=students.find(x=>x.id===a.student_id)?.seat_number??Number(a.student_name)||999;
+      const sb=students.find(x=>x.id===b.student_id)?.seat_number??Number(b.student_name)||999;
+      return Number(sa)-Number(sb);
+    }).map(o=>{
+      const st=students.find(x=>x.id===o.student_id);
+      const seat=st?.seat_number??(Number.isFinite(Number(o.student_name))?Number(o.student_name):'？');
+      const unresolved=String(o.item_name||'').includes('（時價）');
+      const amount=Number(o.unit_price||0)*Number(o.quantity||1);
+      return '<div class="history-pack-order"><span><b>'+esc(seat+'號'+(st?.name?' '+st.name:''))+'</b><small>'+esc(o.item_name||'未記錄品項')+(o.note?' · 備註：'+esc(o.note):'')+'</small></span><strong>'+money(amount)+(unresolved?' ＋ 時價':'')+' · '+(o.paid?'已付款':'未付款')+'</strong></div>';
+    }).join(''):'<div class="loading">這個日期沒有訂單</div>';
+    return '<details class="history-pack"><summary><span><b>'+esc(s.meal_date+' '+(s.menu_templates?.name||'菜單'))+'</b><small>'+rows.length+' 筆 · 已付款 '+paid+' · 未付款 '+(rows.length-paid)+'</small></span><strong>'+money(total)+'</strong></summary><div class="history-pack-orders">'+body+'</div></details>';
+  }).join('');
+}
 async function loadOverview(){
   const id=Number($('overviewSession').value);if(!id)return;
   const s=sessions.find(x=>x.id===id),legacy=s?.legacy_menu_id||-1;
