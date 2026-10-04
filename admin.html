@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-Hant">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>訂飯管理</title><link rel="icon" type="image/png" sizes="180x180" href="icon-192.png?v=20261004-57"><link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?v=20261004-57"><meta name="theme-color" content="#f7e7c6"><link rel="manifest" href="manifest.webmanifest?v=20261004-57"><link rel="stylesheet" href="style.css?v=20261004-57"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>訂飯管理</title><link rel="icon" type="image/png" sizes="180x180" href="icon-192.png?v=20261004-58"><link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?v=20261004-58"><meta name="theme-color" content="#f7e7c6"><link rel="manifest" href="manifest.webmanifest?v=20261004-58"><link rel="stylesheet" href="style.css?v=20261004-58"></head>
 <body>
 <header class="top"><div><div class="eyebrow">ADMIN</div><h1>訂飯管理</h1><p id="loginStatus">請先在首頁登入 99 號，再進入管理頁。</p></div><a class="admin-link" href="index.html">回首頁</a></header>
 <main>
@@ -16,12 +16,13 @@
     <div class="admin-tabs admin-subtabs" data-admin-subgroup="orders">
       <button class="tab active" type="button" data-tab="overview">訂單總覽</button>
       <button class="tab" type="button" data-tab="sessions">訂餐日期</button>
-      <button class="tab" type="button" data-tab="templates">菜單庫</button>
       <button class="tab" type="button" data-tab="changes">訂單異動</button>
+      <button class="tab" type="button" data-tab="history">歷史訂單</button>
     </div>
 
     <div class="admin-tabs admin-subtabs hidden" data-admin-subgroup="management">
       <button class="tab" type="button" data-tab="students">學生管理</button>
+      <button class="tab" type="button" data-tab="templates">菜單庫</button>
       <button class="tab" type="button" data-tab="backups">備份</button>
       <button class="tab" type="button" data-tab="logs">操作紀錄</button>
     </div>
@@ -32,6 +33,16 @@
   <section id="tab-sessions" class="tab-page hidden">
     <div class="panel"><h2>新增訂餐日期</h2><form id="sessionForm" class="admin-form-grid"><label>菜單<select id="sessionTemplate" required></select></label><label>供餐日期<input id="sessionDate" type="date" required></label><label>截止時間<input id="sessionCutoff" type="datetime-local"><small class="hint">預設為供餐日當天 10:00，可自行調整。</small></label><label class="check-row"><input id="sessionActive" type="checkbox" checked> 開放</label><button class="primary" type="submit">新增日期</button></form></div>
     <div class="panel"><div class="section-head"><h2>日期列表</h2><span id="sessionCount"></span></div><div id="sessionList"></div></div>
+  </section>
+
+  <section id="tab-history" class="tab-page hidden">
+    <div class="panel">
+      <div class="section-head">
+        <div><h2>歷史訂單</h2><p class="hint">供餐日期早於今天的訂單會依日期打包收在這裡；今天即使已截止仍留在訂單總覽。</p></div>
+        <span id="historySessionCount"></span>
+      </div>
+      <div id="historyOrderList" class="history-pack-list"><div class="loading">載入中…</div></div>
+    </div>
   </section>
 
   <section id="tab-templates" class="tab-page hidden">
@@ -122,11 +133,11 @@
   </form>
 </dialog>
 
-<button class="app-version" type="button" data-app-version title="點一下重新載入最新版">1.50</button>
+<button class="app-version" type="button" data-app-version title="點一下重新載入最新版">1.51</button>
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>window.APP_CONFIG={supabaseUrl:"https://roynzxilxumfzzuezelg.supabase.co",publishableKey:"sb_publishable_nvmHzVjH7bZ8F9cnJYzKCg_PSPlhCXU"};</script>
-<script src="pwa.js?v=20261004-57"></script>
-<script src="admin.js?v=20261004-57"></script>
+<script src="pwa.js?v=20261004-58"></script>
+<script src="admin.js?v=20261004-58"></script>
 </body></html>
