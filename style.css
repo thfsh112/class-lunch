@@ -61,3 +61,49 @@
   .admin-subtabs{overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px!important;-webkit-overflow-scrolling:touch}
   .admin-subtabs .tab{flex:0 0 auto;white-space:nowrap}
 }
+
+
+/* Equal-width single-row admin navigation */
+.admin-primary-tabs{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:8px!important;
+}
+.admin-primary-tabs .tab{
+  width:100%;
+  min-width:0;
+  text-align:center;
+  white-space:nowrap;
+}
+.admin-subtabs{
+  display:grid!important;
+  gap:8px!important;
+  overflow:visible!important;
+}
+.admin-subtabs[data-admin-subgroup="orders"]{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+}
+.admin-subtabs[data-admin-subgroup="management"]{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+}
+.admin-subtabs .tab{
+  width:100%;
+  min-width:0;
+  text-align:center;
+  white-space:nowrap;
+  padding-left:6px;
+  padding-right:6px;
+}
+.admin-subtabs.hidden{display:none!important}
+@media(max-width:640px){
+  .admin-primary-tabs,
+  .admin-subtabs{
+    gap:6px!important;
+  }
+  .admin-primary-tabs .tab,
+  .admin-subtabs .tab{
+    font-size:13px;
+    padding-top:9px;
+    padding-bottom:9px;
+  }
+}
