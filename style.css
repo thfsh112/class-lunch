@@ -107,3 +107,51 @@
     padding-bottom:9px;
   }
 }
+
+
+/* v1.43 account card layout */
+.hero-account-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+}
+.hero-logout{
+  border:1px solid #e4d2ca;
+  background:#f9f3ef;
+  border-radius:12px;
+  padding:8px 13px;
+  color:#6f554d;
+  cursor:pointer;
+  font-weight:700;
+  white-space:nowrap;
+}
+.hero-logout:hover{transform:translateY(-1px)}
+.hero-account-actions{
+  display:flex!important;
+  flex-wrap:nowrap!important;
+  gap:8px!important;
+  width:100%;
+}
+.hero-account-actions .hero-action{
+  flex:1 1 0;
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  white-space:nowrap;
+  padding-left:7px;
+  padding-right:7px;
+}
+.hero-account-actions .hero-action.hidden{display:none!important}
+@media(max-width:720px){
+  .hero-account-actions{
+    display:flex!important;
+    grid-template-columns:none!important;
+  }
+  .hero-account-actions .hero-action{
+    font-size:13px;
+    padding:10px 5px;
+  }
+}
