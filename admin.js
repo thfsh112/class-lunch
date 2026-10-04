@@ -53,7 +53,6 @@ $('logoutBtn').addEventListener('click',async()=>{
   await db.auth.signOut();
   refresh();
 });
-$('adminAccountBtn')?.addEventListener('click',()=>toast('99 號密碼固定為 099，不能修改'));
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>$(b.dataset.close).close()));
 
 async function openAdminTab(tab){
