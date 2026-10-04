@@ -256,6 +256,51 @@ async function syncMenuPriceChangesToOrders(menuTemplateId){
   return Number(data?.orders_updated||0);
 }
 
+async function deleteCurrentTemplate(){
+  const t=templates.find(x=>x.id===editingTemplateId);if(!t)return;
+  const{count:sessionCount,error:sessionError}=await db.from('meal_sessions')
+    .select('id',{count:'exact',head:true})
+    .eq('menu_template_id',t.id);
+  if(sessionError)return toast('檢查訂餐日期失敗：'+sessionError.message);
+  if((sessionCount||0)>0)return toast('這份菜單已被訂餐日期使用，不能永久刪除；請改為停用');
+
+  const{data:itemRows,error:itemError}=await db.from('menu_items')
+    .select('id')
+    .eq('menu_template_id',t.id);
+  if(itemError)return toast('檢查菜單品項失敗：'+itemError.message);
+  const itemIds=(itemRows||[]).map(x=>Number(x.id));
+  if(itemIds.length){
+    const{count:orderItemCount,error:orderItemError}=await db.from('order_items')
+      .select('id',{count:'exact',head:true})
+      .in('menu_item_id',itemIds);
+    if(orderItemError)return toast('檢查既有訂單失敗：'+orderItemError.message);
+    if((orderItemCount||0)>0)return toast('這份菜單已有訂單紀錄，不能永久刪除；請改為停用');
+  }
+
+  if(!confirm('永久刪除「'+t.name+'」？\n\n菜單、品項與圖片都會刪除，且無法復原。'))return;
+
+  const{error}=await db.from('menu_templates').delete().eq('id',t.id);
+  if(error)return toast('刪除菜單失敗：'+error.message);
+
+  if(t.image_url){
+    try{
+      const u=new URL(t.image_url);
+      const marker='/storage/v1/object/public/menu-images/';
+      const pos=u.pathname.indexOf(marker);
+      if(pos>=0){
+        const storagePath=decodeURIComponent(u.pathname.slice(pos+marker.length));
+        if(storagePath)await db.storage.from('menu-images').remove([storagePath]);
+      }
+    }catch(error){console.warn('menu_image_cleanup_failed',error)}
+  }
+
+  $('templateDialog').close();
+  editingTemplateId=null;
+  toast('菜單已永久刪除');
+  await loadTemplates();renderTemplateSelect();await loadSessions();
+}
+$('deleteTemplateBtn').addEventListener('click',deleteCurrentTemplate);
+
 $('templateEditForm').addEventListener('submit',async e=>{
   e.preventDefault();const t=templates.find(x=>x.id===editingTemplateId);if(!t)return;
   const name=$('editTemplateName').value.trim();if(!name)return toast('菜單名稱不能空白');
