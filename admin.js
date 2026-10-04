@@ -250,6 +250,47 @@ $('ocrMenuBtn').addEventListener('click',async()=>{
   }catch(err){toast('OCR 失敗：'+(err?.message||err))}
   finally{b.disabled=false;b.textContent='辨識菜單';$('ocrProgress').textContent='';}
 });
+async function syncMenuPriceChangesToOrders(changedRows){
+  const rows=(changedRows||[]).filter(x=>x?.id);
+  if(!rows.length)return 0;
+  const itemIds=rows.map(x=>Number(x.id));
+  const{data:refs,error:refError}=await db.from('order_items')
+    .select('id,order_id,menu_item_id')
+    .in('menu_item_id',itemIds);
+  if(refError)throw new Error('讀取受影響訂單失敗：'+refError.message);
+
+  for(const row of rows){
+    const patch=row.is_market_price
+      ?{unit_price:0,is_market_price:true}
+      :{unit_price:Number(row.price||0),is_market_price:false,market_price_amount:null};
+    const{error}=await db.from('order_items').update(patch).eq('menu_item_id',row.id);
+    if(error)throw new Error('同步訂單品項價格失敗：'+error.message);
+  }
+
+  const orderIds=[...new Set((refs||[]).map(x=>Number(x.order_id)).filter(Number.isFinite))];
+  if(!orderIds.length)return 0;
+
+  const{data:items,error:itemsError}=await db.from('order_items')
+    .select('order_id,quantity,unit_price,is_market_price,market_price_amount')
+    .in('order_id',orderIds);
+  if(itemsError)throw new Error('重新計算訂單失敗：'+itemsError.message);
+
+  const totals=new Map(orderIds.map(id=>[id,0]));
+  for(const item of (items||[])){
+    const qty=Number(item.quantity||1);
+    const unit=item.is_market_price
+      ?Number(item.market_price_amount||0)
+      :Number(item.unit_price||0);
+    totals.set(Number(item.order_id),(totals.get(Number(item.order_id))||0)+unit*qty);
+  }
+
+  for(const [orderId,total] of totals){
+    const{error}=await db.from('orders').update({unit_price:total}).eq('id',orderId);
+    if(error)throw new Error('更新整張訂單金額失敗：'+error.message);
+  }
+  return orderIds.length;
+}
+
 $('templateEditForm').addEventListener('submit',async e=>{
   e.preventDefault();const t=templates.find(x=>x.id===editingTemplateId);if(!t)return;
   const name=$('editTemplateName').value.trim();if(!name)return toast('菜單名稱不能空白');
@@ -258,6 +299,18 @@ $('templateEditForm').addEventListener('submit',async e=>{
   const{error}=await db.from('menu_templates').update(patch).eq('id',editingTemplateId);if(error)return toast(error.message);
   const cleaned=menuEditorItems.map((x,i)=>({id:x.id||null,menu_template_id:editingTemplateId,category:String(x.category||'').trim(),name:String(x.name||'').trim(),price:x.is_market_price?0:Number(x.price||0),is_market_price:!!x.is_market_price,active:x.active!==false,sort_order:i})).filter(x=>x.name);
   if(cleaned.some(x=>!Number.isInteger(x.price)||x.price<0||x.price>10000))return toast('品項價格格式不正確');
+
+  const{data:currentItems,error:currentItemsError}=await db.from('menu_items')
+    .select('id,price,is_market_price')
+    .eq('menu_template_id',editingTemplateId);
+  if(currentItemsError)return toast('讀取原本菜單價格失敗：'+currentItemsError.message);
+  const currentItemMap=new Map((currentItems||[]).map(x=>[Number(x.id),x]));
+  const priceChangedRows=cleaned.filter(x=>{
+    if(!x.id)return false;
+    const old=currentItemMap.get(Number(x.id));
+    if(!old)return false;
+    return Number(old.price||0)!==Number(x.price||0)||Boolean(old.is_market_price)!==Boolean(x.is_market_price);
+  });
 
   const keptIds=new Set(cleaned.filter(x=>x.id).map(x=>Number(x.id)));
   const removedIds=originalMenuItemIds.filter(id=>!keptIds.has(Number(id)));
@@ -290,7 +343,19 @@ $('templateEditForm').addEventListener('submit',async e=>{
     const r=await db.from('menu_items').insert(newRows);
     if(r.error)return toast('品項新增失敗：'+r.error.message);
   }
-  $('templateDialog').close();toast('菜單與品項已更新');await loadTemplates();renderTemplateSelect();await loadSessions();
+
+  let affectedOrders=0;
+  if(priceChangedRows.length){
+    try{
+      affectedOrders=await syncMenuPriceChangesToOrders(priceChangedRows);
+    }catch(error){
+      return toast(error?.message||String(error));
+    }
+  }
+
+  $('templateDialog').close();
+  toast(affectedOrders?'菜單已更新，並重算 '+affectedOrders+' 張訂單':'菜單與品項已更新');
+  await loadTemplates();renderTemplateSelect();await loadSessions();
 });
 
 $('sessionDate').addEventListener('change',()=>applyDefaultSessionCutoff(true));
