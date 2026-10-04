@@ -198,19 +198,21 @@ window.addEventListener('appinstalled',()=>{
   toast('班級訂飯已安裝');
 });
 async function upsertCurrentPushSubscription(subscription){
-  if(!student||!subscription)return;
+  if(!subscription)return;
   const json=subscription.toJSON();
   if(!json.endpoint||!json.keys?.p256dh||!json.keys?.auth)throw new Error('subscription_keys_missing');
-  const{error}=await db.from('class_lunch_push_subscriptions').upsert({
-    student_id:student.id,
-    endpoint:json.endpoint,
-    p256dh:json.keys.p256dh,
-    auth_secret:json.keys.auth
-  },{onConflict:'endpoint'});
+  const{data,error}=await db.functions.invoke('class-lunch-push',{body:{
+    action:'subscribe',
+    subscription:{
+      endpoint:json.endpoint,
+      keys:{p256dh:json.keys.p256dh,auth:json.keys.auth}
+    }
+  }});
   if(error)throw error;
+  if(data?.error)throw new Error(data.error);
 }
 async function syncPushAfterPermissionGranted(showToast=true){
-  if(pushPermissionSyncing||!student||Notification.permission!=='granted')return;
+  if(pushPermissionSyncing||Notification.permission!=='granted')return;
   pushPermissionSyncing=true;
   try{
     const reg=await getPushRegistration();
@@ -261,7 +263,7 @@ async function refreshPushStatus(){
   if(Notification.permission==='granted'&&sub){
     status.textContent='通知已開啟。';
     enable.classList.add('hidden');disable.classList.remove('hidden');
-    if(student){try{await upsertCurrentPushSubscription(sub)}catch(error){console.warn('push_sync_failed',error)}}
+    try{await upsertCurrentPushSubscription(sub)}catch(error){console.warn('push_sync_failed',error)}
     return;
   }
   enable.classList.remove('hidden');disable.classList.add('hidden');
@@ -274,7 +276,6 @@ async function refreshPushStatus(){
   }
 }
 async function enablePushNotifications(){
-  if(!student)return toast('請先登入');
   if(!('Notification' in window)||!('PushManager' in window)||!('serviceWorker' in navigator))return toast('此裝置不支援推播通知');
   const permission=await Notification.requestPermission();
   if(permission!=='granted'){
@@ -321,10 +322,12 @@ async function disablePushNotifications(){
   try{
     const sub=await getCurrentPushSubscription();
     if(sub){
-      if(student){
-        const{error}=await db.from('class_lunch_push_subscriptions').delete().eq('endpoint',sub.endpoint);
-        if(error)throw error;
-      }
+      const{data,error}=await db.functions.invoke('class-lunch-push',{body:{
+        action:'unsubscribe',
+        endpoint:sub.endpoint
+      }});
+      if(error)throw error;
+      if(data?.error)throw new Error(data.error);
       await sub.unsubscribe();
     }
     await refreshPushStatus();
@@ -335,12 +338,7 @@ async function disablePushNotifications(){
   }
 }
 async function detachPushBeforeLogout(){
-  try{
-    const sub=await getCurrentPushSubscription();
-    if(!sub)return;
-    if(student)await db.from('class_lunch_push_subscriptions').delete().eq('endpoint',sub.endpoint);
-    await sub.unsubscribe();
-  }catch(error){console.warn('push_logout_cleanup_failed',error)}
+  // 通知以裝置為單位；登出不取消這支裝置的推播訂閱。
 }
 async function openAccountDialog(){
   $('passwordForm').reset();
