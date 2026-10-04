@@ -43,3 +43,21 @@
 .backup-row>div{min-width:0}.backup-row button{white-space:nowrap}
 .danger-zone{margin-top:14px;padding-top:10px;border-top:1px dashed #e2c8be}.danger-zone summary{cursor:pointer;color:#9a5a50;font-weight:800}.danger-zone p{margin:8px 0}
 @media(max-width:720px){.unpaid-list{grid-template-columns:1fr}.change-row,.backup-row{flex-direction:column}.change-row time{white-space:normal}.backup-row button{width:100%}.backup-controls{align-items:stretch;flex-direction:column}.backup-controls label{min-width:0;width:100%}}
+
+
+/* Two-level admin navigation */
+.admin-nav{max-width:1080px;margin:0 auto 14px;padding:0 18px}
+.admin-nav .admin-tabs{max-width:none;margin:0;padding:0}
+.admin-primary-tabs{gap:10px;margin-bottom:10px!important}
+.admin-primary-tabs .tab{font-weight:850;padding:10px 16px}
+.admin-primary-tabs .tab[data-admin-group].active{background:#7e6057;color:#fff;border-color:#7e6057}
+.admin-subtabs{gap:8px;padding:10px 0 0!important;border-top:1px solid #eadbd4}
+.admin-subtabs .tab{padding:8px 13px}
+.admin-subtabs .tab.active{background:#c47e6b;color:#fff;border-color:#c47e6b}
+@media(max-width:640px){
+  .admin-nav{padding:0 14px}
+  .admin-primary-tabs{display:grid;grid-template-columns:1fr 1fr auto}
+  .admin-primary-tabs .tab{padding:10px 12px}
+  .admin-subtabs{overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px!important;-webkit-overflow-scrolling:touch}
+  .admin-subtabs .tab{flex:0 0 auto;white-space:nowrap}
+}

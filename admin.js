@@ -55,13 +55,25 @@ $('logoutBtn').addEventListener('click',async()=>{
 });
 $('adminAccountBtn')?.addEventListener('click',()=>toast('99 號密碼固定為 099，不能修改'));
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>$(b.dataset.close).close()));
-document.querySelectorAll('.tab[data-tab]').forEach(b=>b.addEventListener('click',async()=>{
-  document.querySelectorAll('.tab[data-tab]').forEach(x=>x.classList.toggle('active',x===b));
+
+async function openAdminTab(tab){
+  const button=document.querySelector('.tab[data-tab="'+tab+'"]');
+  if(!button)return;
+  document.querySelectorAll('.tab[data-tab]').forEach(x=>x.classList.toggle('active',x===button));
   document.querySelectorAll('.tab-page').forEach(p=>p.classList.add('hidden'));
-  $('tab-'+b.dataset.tab).classList.remove('hidden');
-  if(b.dataset.tab==='logs')await loadLogs();
-  if(b.dataset.tab==='changes')await loadOrderChanges();
-  if(b.dataset.tab==='backups')await loadBackups();
+  $('tab-'+tab)?.classList.remove('hidden');
+  if(tab==='logs')await loadLogs();
+  if(tab==='changes')await loadOrderChanges();
+  if(tab==='backups')await loadBackups();
+}
+
+document.querySelectorAll('.tab[data-tab]').forEach(b=>b.addEventListener('click',()=>openAdminTab(b.dataset.tab)));
+
+document.querySelectorAll('[data-admin-group]').forEach(b=>b.addEventListener('click',async()=>{
+  const group=b.dataset.adminGroup;
+  document.querySelectorAll('[data-admin-group]').forEach(x=>x.classList.toggle('active',x===b));
+  document.querySelectorAll('[data-admin-subgroup]').forEach(x=>x.classList.toggle('hidden',x.dataset.adminSubgroup!==group));
+  await openAdminTab(group==='orders'?'overview':'students');
 }));
 
 async function migrateLegacyAdminSession(){

@@ -1,22 +1,32 @@
 <!doctype html>
 <html lang="zh-Hant">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>訂飯管理</title><link rel="icon" type="image/png" sizes="180x180" href="icon-192.png?v=20261004-44"><link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?v=20261004-44"><meta name="theme-color" content="#f7e7c6"><link rel="manifest" href="manifest.webmanifest?v=20261004-44"><link rel="stylesheet" href="style.css?v=20261004-44"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>訂飯管理</title><link rel="icon" type="image/png" sizes="180x180" href="icon-192.png?v=20261004-46"><link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?v=20261004-46"><meta name="theme-color" content="#f7e7c6"><link rel="manifest" href="manifest.webmanifest?v=20261004-46"><link rel="stylesheet" href="style.css?v=20261004-46"></head>
 <body>
 <header class="top"><div><div class="eyebrow">ADMIN</div><h1>訂飯管理</h1><p id="loginStatus">請先在首頁登入 99 號，再進入管理頁。</p></div><a class="admin-link" href="index.html">回首頁</a></header>
 <main>
 <section id="loginBox" class="panel login-panel"><h2>管理者登入</h2><p class="hint">請先在首頁登入 99 號，再輸入管理帳號密碼。</p><form id="loginForm"><label>帳號<input id="adminUsername" type="text" required autocomplete="username" placeholder="tnfsh112"></label><label>密碼<input id="password" type="password" required autocomplete="current-password"></label><button class="primary" type="submit">進入管理</button></form></section>
 <div id="adminApp" class="hidden">
-  <div class="admin-tabs">
-    <button class="tab active" data-tab="overview">訂單總覽</button>
-    <button class="tab" data-tab="sessions">訂餐日期</button>
-    <button class="tab" data-tab="templates">菜單庫</button>
-    <button class="tab" data-tab="students">學生管理</button>
-    <button class="tab" data-tab="changes">訂單異動</button>
-    <button class="tab" data-tab="backups">備份</button>
-    <button class="tab" data-tab="logs">操作紀錄</button>
-    <button class="tab ghost" id="adminAccountBtn" type="button">99 密碼固定</button>
-    <button class="tab ghost" id="logoutBtn">登出</button>
-  </div>
+  <nav class="admin-nav" aria-label="管理功能">
+    <div class="admin-tabs admin-primary-tabs">
+      <button class="tab active" type="button" data-admin-group="orders">訂餐系列</button>
+      <button class="tab" type="button" data-admin-group="management">管理系列</button>
+      <button class="tab ghost" id="logoutBtn" type="button">登出</button>
+    </div>
+
+    <div class="admin-tabs admin-subtabs" data-admin-subgroup="orders">
+      <button class="tab active" type="button" data-tab="overview">訂單總覽</button>
+      <button class="tab" type="button" data-tab="sessions">訂餐日期</button>
+      <button class="tab" type="button" data-tab="templates">菜單庫</button>
+    </div>
+
+    <div class="admin-tabs admin-subtabs hidden" data-admin-subgroup="management">
+      <button class="tab" type="button" data-tab="students">學生管理</button>
+      <button class="tab" type="button" data-tab="changes">訂單異動</button>
+      <button class="tab" type="button" data-tab="backups">備份</button>
+      <button class="tab" type="button" data-tab="logs">操作紀錄</button>
+      <button class="tab ghost" id="adminAccountBtn" type="button">99 密碼固定</button>
+    </div>
+  </nav>
 
   <section id="tab-overview" class="tab-page"><div class="panel"><div class="section-head"><h2>訂單總覽</h2><select id="overviewSession"></select></div><div class="stats"><div class="stat"><small>已訂</small><b id="statOrders">0</b></div><div class="stat"><small>已付款</small><b id="statPaid">0</b></div><div class="stat"><small>未付款</small><b id="statUnpaidCount">0</b></div><div class="stat"><small>總金額</small><b id="statTotal">$0</b></div></div><div id="itemStats" class="item-stats"></div><div id="unpaidSummary" class="item-stats unpaid-summary"></div><div id="seatPayments"></div></div></section>
 
@@ -119,6 +129,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>window.APP_CONFIG={supabaseUrl:"https://roynzxilxumfzzuezelg.supabase.co",publishableKey:"sb_publishable_nvmHzVjH7bZ8F9cnJYzKCg_PSPlhCXU"};</script>
-<script src="pwa.js?v=20261004-44"></script>
-<script src="admin.js?v=20261004-44"></script>
+<script src="pwa.js?v=20261004-46"></script>
+<script src="admin.js?v=20261004-46"></script>
 </body></html>

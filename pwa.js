@@ -48,7 +48,7 @@
   async function registerPwa(){
     try{
       await cleanupOldRegistrations();
-      let reg=await navigator.serviceWorker.register("/class-lunch/service-worker.js?v=20261004-45",{scope:"/class-lunch/",updateViaCache:"none"});
+      let reg=await navigator.serviceWorker.register("/class-lunch/service-worker.js?v=20261004-46",{scope:"/class-lunch/",updateViaCache:"none"});
       await navigator.serviceWorker.ready;
       try{await reg.update()}catch{}
       window.CLASS_LUNCH_PWA_STATUS={supported:true,ready:true,error:null,registration:reg};
