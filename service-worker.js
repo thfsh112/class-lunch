@@ -1,19 +1,19 @@
-const STATIC_CACHE="class-lunch-static-v20261004-55";
+const STATIC_CACHE="class-lunch-static-v20261004-56";
 const IMAGE_CACHE="class-lunch-menu-images-v1";
 
 const APP_SHELL=[
   "./",
   "./index.html",
   "./admin.html",
-  "./style.css?v=20261004-55",
-  "./app.js?v=20261004-55",
-  "./admin.js?v=20261004-55",
-  "./pwa.js?v=20261004-55",
-  "./manifest.webmanifest?v=20261004-55",
-  "./icon-192.png?v=20261004-55",
-  "./icon-512.png?v=20261004-55",
-  "./notification-icon.png?v=20261004-55",
-  "./notification-badge.png?v=20261004-55"
+  "./style.css?v=20261004-56",
+  "./app.js?v=20261004-56",
+  "./admin.js?v=20261004-56",
+  "./pwa.js?v=20261004-56",
+  "./manifest.webmanifest?v=20261004-56",
+  "./icon-192.png?v=20261004-56",
+  "./icon-512.png?v=20261004-56",
+  "./notification-icon.png?v=20261004-56",
+  "./notification-badge.png?v=20261004-56"
 ];
 
 self.addEventListener("install",event=>{
@@ -112,8 +112,8 @@ self.addEventListener("push",event=>{
   event.waitUntil(
     self.registration.showNotification(payload.title||"班級訂飯",{
       body:payload.body||"訂餐有新通知",
-      icon:"./notification-icon.png?v=20261004-55",
-      badge:"./notification-badge.png?v=20261004-55",
+      icon:"./notification-icon.png?v=20261004-56",
+      badge:"./notification-badge.png?v=20261004-56",
       tag:payload.tag||"class-lunch-notice",
       renotify:true,
       data:payload.data||{url:"https://thfsh112.github.io/class-lunch/"}
