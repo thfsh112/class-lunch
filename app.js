@@ -271,9 +271,7 @@ async function refreshPushStatus(){
   await initializeDevicePushPreference();
   const sub=await getCurrentPushSubscription();
   if(Notification.permission==='granted'&&sub&&devicePushOptedIn()){
-    status.textContent=student?.seat_number===99
-      ?'通知已開啟（目前登入 99，此裝置會接收推播）。'
-      :'此裝置通知已開啟；只有目前登入 99 時才會接收訂餐推播。';
+    status.textContent='通知已開啟（僅此裝置）。';
     enable.classList.add('hidden');disable.classList.remove('hidden');
     try{await upsertCurrentPushSubscription(sub)}catch(error){console.warn('push_sync_failed',error)}
     return;
