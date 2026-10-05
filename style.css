@@ -181,3 +181,29 @@
 .lunch-empty-egg b,.lunch-empty-egg span{display:block}
 .lunch-empty-egg b{color:#6f554d;margin-bottom:5px}
 .admin-night-egg{display:inline-block;margin:6px 0 0;padding:5px 9px;border:1px dashed #d9b7a8;border-radius:999px;color:#8f675b;font-size:12px;font-weight:700;background:#fff8f2}
+
+
+/* Money flow subtabs: four equal columns */
+.admin-subtabs[data-admin-subgroup="money"]{
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  gap:8px!important;
+  overflow:visible!important;
+}
+.admin-subtabs[data-admin-subgroup="money"] .tab{
+  width:100%;
+  min-width:0;
+  text-align:center;
+  white-space:nowrap;
+}
+@media(max-width:640px){
+  .admin-subtabs[data-admin-subgroup="money"]{
+    display:grid!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    overflow:visible!important;
+  }
+  .admin-subtabs[data-admin-subgroup="money"] .tab{
+    padding:8px 4px;
+    font-size:12px;
+  }
+}
