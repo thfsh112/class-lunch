@@ -295,4 +295,9 @@
       loadWalletLedger().catch(()=>{});
     }
   },900);
+
+  // Tiny count-only refresh while admin is open; avoids pulling the full topup list.
+  setInterval(()=>{
+    if(adminGatePassed)loadWalletPendingCounts().catch(()=>{});
+  },60000);
 })();
