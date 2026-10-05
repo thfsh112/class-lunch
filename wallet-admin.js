@@ -83,9 +83,18 @@
         '<div class="history-main"><div class="history-title"><b>'+x.seat_number+'號 '+esc(x.name||'')+'</b><span class="'+(x.status==='approved'?'history-paid':'history-unpaid')+'">'+topupStatusLabel(x.status)+'</span></div>'+
         '<div class="history-items">申請 '+money(x.requested_amount)+(x.actual_amount!=null?' · 實收 '+money(x.actual_amount):'')+'</div>'+
         '<small>'+new Date(x.requested_at).toLocaleString('zh-TW')+'</small></div>'+
-        (x.status==='pending'?'<div><button class="small-btn" type="button" data-wallet-topup-approve="'+x.id+'" data-requested="'+x.requested_amount+'">確認／修改實收</button></div>':'')+
+        (x.status==='pending'?'<div><button class="small-btn" type="button" data-wallet-topup-approve="'+x.id+'" data-requested="'+x.requested_amount+'">確認／修改實收</button> <button class="small-btn danger" type="button" data-wallet-topup-reject="'+x.id+'">拒絕</button></div>':'')+
       '</article>'
     ).join(''):'<div class="loading">目前沒有加值申請</div>';
+
+    box.querySelectorAll('[data-wallet-topup-reject]').forEach(btn=>btn.addEventListener('click',async()=>{
+      const note=prompt('拒絕原因（可留空）：','');
+      if(note===null)return;
+      const {error}=await db.rpc('class_lunch_wallet_admin_reject_topup',{p_request_id:Number(btn.dataset.walletTopupReject),p_note:note});
+      if(error)return toast('拒絕失敗：'+error.message);
+      toast('加值申請已拒絕');
+      await loadWalletTopups();
+    }));
 
     box.querySelectorAll('[data-wallet-topup-approve]').forEach(btn=>btn.addEventListener('click',async()=>{
       const requested=Number(btn.dataset.requested);
@@ -117,10 +126,20 @@
         '<small>'+new Date(x.requested_at).toLocaleString('zh-TW')+'</small></div>'+
         '<div>'+
           (x.status==='student_requested'?'<button class="small-btn" type="button" data-wallet-settle-confirm="'+x.id+'">管理端確認</button> ':'')+
-          (x.status==='student_final_confirmed'?'<button class="small-btn danger" type="button" data-wallet-settle-complete="'+x.id+'">正式同意結清</button>':'')+
+          (x.status==='student_final_confirmed'?'<button class="small-btn danger" type="button" data-wallet-settle-complete="'+x.id+'">正式同意結清</button> ':'')+
+          (!['completed','rejected','cancelled'].includes(x.status)?'<button class="small-btn ghost danger" type="button" data-wallet-settle-reject="'+x.id+'">拒絕／取消</button>':'')+
         '</div>'+
       '</article>'
     ).join(''):'<div class="loading">目前沒有結清紀錄</div>';
+
+    box.querySelectorAll('[data-wallet-settle-reject]').forEach(btn=>btn.addEventListener('click',async()=>{
+      const note=prompt('拒絕／取消原因（可留空）：','');
+      if(note===null)return;
+      const {error}=await db.rpc('class_lunch_wallet_admin_reject_settlement',{p_request_id:Number(btn.dataset.walletSettleReject),p_note:note});
+      if(error)return toast('處理失敗：'+error.message);
+      toast('結清流程已結束');
+      await Promise.all([loadWalletSettlements(),loadWalletBalances()]);
+    }));
 
     box.querySelectorAll('[data-wallet-settle-confirm]').forEach(btn=>btn.addEventListener('click',async()=>{
       const {error}=await db.rpc('class_lunch_wallet_admin_confirm_settlement',{p_request_id:Number(btn.dataset.walletSettleConfirm)});
@@ -149,11 +168,29 @@
       '<article class="history-row">'+
         '<div class="history-main"><div class="history-title"><b>'+x.seat_number+'號 '+esc(x.name||'')+' · '+esc(txLabel(x.tx_type))+'</b></div>'+
         '<div class="history-items">'+esc(x.note||'')+(x.order_id?' · 訂單 #'+x.order_id:'')+'</div>'+
-        '<small>'+new Date(x.created_at).toLocaleString('zh-TW')+' · 交易後餘額 '+money(x.balance_after)+'</small></div>'+
+        '<small>'+new Date(x.created_at).toLocaleString('zh-TW')+' · 第 '+Number(x.generation||1)+' 期 · 交易後餘額 '+money(x.balance_after)+(x.reversal_of_transaction_id?' · 沖銷 #'+x.reversal_of_transaction_id:'')+'</small></div>'+
         '<strong class="history-price">'+(Number(x.amount)>0?'+':'')+money(x.amount).replace('$-','-$')+'</strong>'+
       '</article>'
     ).join(''):'<div class="loading">目前沒有金錢流水</div>';
   }
+
+  const originalDeleteOrder=window.deleteOrder;
+  window.deleteOrder=async function(id){
+    if(!confirm('確定刪除這筆訂單？\n已付款訂單會先建立沖銷紀錄，再刪除訂單。'))return;
+    try{
+      const {error}=await db.rpc('class_lunch_wallet_admin_delete_order',{p_order_id:id});
+      if(error){
+        if(originalDeleteOrder&&/沒有綁定學生帳號/.test(error.message||''))return originalDeleteOrder(id);
+        throw error;
+      }
+      toast('訂單已刪除');
+      await loadOverview();
+      loadWalletLedger().catch(()=>{});
+      loadWalletBalances().catch(()=>{});
+    }catch(error){
+      toast('刪除失敗：'+error.message);
+    }
+  };
 
   const originalToggle=window.togglePaid;
   window.togglePaid=async function(id,n){
