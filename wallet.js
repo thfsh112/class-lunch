@@ -1,7 +1,7 @@
 (()=>{
-  const TEST_SEAT=99;
   const byId=id=>document.getElementById(id);
-  const isWalletTester=()=>typeof student!=='undefined'&&Number(student?.seat_number)===TEST_SEAT;
+  let walletEnabled=false;
+  const isWalletEnabled=()=>walletEnabled&&typeof student!=='undefined'&&student?.seat_number!==undefined&&student?.seat_number!==null;
   let walletSnapshot=null;
 
   function injectUi(){
@@ -22,7 +22,7 @@
       dialog.className='form-dialog';
       dialog.innerHTML=`
         <div class="history-shell">
-          <div class="dialog-head"><div><small>WALLET TEST</small><h2>餐費錢包</h2></div><button type="button" class="close-dialog" id="walletCloseBtn">×</button></div>
+          <div class="dialog-head"><div><small>WALLET</small><h2>餐費錢包</h2></div><button type="button" class="close-dialog" id="walletCloseBtn">×</button></div>
           <div class="admin-tabs wallet-student-tabs">
             <button class="tab active" type="button" data-wallet-tab="overview">餘額／儲值</button>
             <button class="tab" type="button" data-wallet-tab="ledger">交易紀錄</button>
@@ -103,9 +103,16 @@
 
   async function refreshVisibility(){
     injectUi();
-    const enabled=isWalletTester();
-    byId('walletBtn')?.classList.toggle('hidden',!enabled);
-    if(!enabled){
+    walletEnabled=false;
+    if(typeof student!=='undefined'&&student?.seat_number!==undefined&&student?.seat_number!==null){
+      const {data,error}=await db.rpc('class_lunch_wallet_me');
+      if(!error&&data){
+        walletEnabled=true;
+        walletSnapshot=data;
+      }
+    }
+    byId('walletBtn')?.classList.toggle('hidden',!walletEnabled);
+    if(!walletEnabled){
       byId('walletPaymentBox')?.classList.add('hidden');
       if(byId('walletDialog')?.open)byId('walletDialog').close();
       return;
@@ -122,7 +129,7 @@
 
   async function refreshCheckout(){
     const box=byId('walletPaymentBox');
-    if(!box||!isWalletTester())return;
+    if(!box||!isWalletEnabled())return;
     box.classList.remove('hidden');
     try{
       const w=await fetchWallet();
@@ -169,7 +176,7 @@
   }
 
   async function refreshWallet(){
-    if(!isWalletTester())return;
+    if(!isWalletEnabled())return;
     try{
       const [wRes,txRes,topupRes,settleRes,unpaidRes]=await Promise.all([
         db.rpc('class_lunch_wallet_me'),
@@ -241,7 +248,7 @@
       const disabled=Number(walletSnapshot?.balance)<0?'disabled':'';
       area.innerHTML=`
         <form id="walletSettlementStartForm">
-          <label>座號<input id="walletSettleSeat" type="number" value="99" required></label>
+          <label>座號<input id="walletSettleSeat" type="number" value="${student?.seat_number??''}" required></label>
           <label>密碼<input id="walletSettlePassword" type="password" required autocomplete="current-password"></label>
           <div class="dialog-actions"><button class="danger" type="submit" ${disabled}>申請結清</button></div>
         </form>`;
@@ -252,7 +259,7 @@
     if(req.status==='admin_started'){
       area.insertAdjacentHTML('beforeend',`
         <form id="walletAdminStartedConfirmForm">
-          <label>座號<input id="walletAdminStartedSeat" type="number" value="99" required></label>
+          <label>座號<input id="walletAdminStartedSeat" type="number" value="${student?.seat_number??''}" required></label>
           <label>密碼<input id="walletAdminStartedPassword" type="password" required autocomplete="current-password"></label>
           <div class="dialog-actions"><button class="primary" type="submit">確認管理端發起結清</button></div>
         </form>`);
@@ -265,7 +272,7 @@
     if(req.status==='admin_confirmed'){
       area.insertAdjacentHTML('beforeend',`
         <form id="walletSettlementFinalForm">
-          <label>座號<input id="walletFinalSeat" type="number" value="99" required></label>
+          <label>座號<input id="walletFinalSeat" type="number" value="${student?.seat_number??''}" required></label>
           <label>姓名<input id="walletFinalName" required></label>
           <label>密碼<input id="walletFinalPassword" type="password" required autocomplete="current-password"></label>
           <div class="dialog-actions"><button class="danger" type="submit">最終確認結清</button></div>
@@ -277,7 +284,8 @@
 
   async function reauth(seat,password){
     const n=Number(seat);
-    if(n!==TEST_SEAT)throw new Error('座號不正確');
+    const currentSeat=Number(student?.seat_number);
+    if(!Number.isInteger(currentSeat)||n!==currentSeat)throw new Error('座號不正確');
     const {error}=await db.auth.signInWithPassword({email:internalEmail(n),password:authPassword(password)});
     if(error)throw new Error('座號或密碼錯誤');
   }
@@ -372,14 +380,14 @@
   }
 
   async function openWallet(){
-    if(!isWalletTester())return;
+    if(!isWalletEnabled())return;
     switchWalletTab('overview');
     byId('walletDialog').showModal();
     await refreshWallet();
   }
 
   async function handleWalletCheckout(e){
-    if(!isWalletTester())return;
+    if(!isWalletEnabled())return;
     e.preventDefault();
     e.stopImmediatePropagation();
     if(!editingSessionId)return;
@@ -425,7 +433,7 @@
   function observeOrderDialog(){
     const dialog=byId('orderDialog');
     if(!dialog)return;
-    new MutationObserver(()=>{if(dialog.open&&isWalletTester())refreshCheckout()})
+    new MutationObserver(()=>{if(dialog.open&&isWalletEnabled())refreshCheckout()})
       .observe(dialog,{attributes:true,attributeFilter:['open']});
     byId('orderDialogForm')?.addEventListener('submit',handleWalletCheckout,true);
   }
