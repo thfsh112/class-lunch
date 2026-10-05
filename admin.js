@@ -69,7 +69,7 @@ $('loginForm').addEventListener('submit',async e=>{
   $('password').value='';
   await refresh();
 });
-$('logoutBtn').addEventListener('click',async()=>{
+$('logoutBtn')?.addEventListener('click',async()=>{
   try{await db.functions.invoke('class-lunch-admin-login',{body:{action:'logout'}})}catch{}
   adminGatePassed=false;
   localStorage.removeItem('class-lunch-admin-gate');
@@ -131,7 +131,7 @@ document.querySelectorAll('[data-admin-group]').forEach(b=>b.addEventListener('c
   const group=b.dataset.adminGroup;
   document.querySelectorAll('[data-admin-group]').forEach(x=>x.classList.toggle('active',x===b));
   document.querySelectorAll('[data-admin-subgroup]').forEach(x=>x.classList.toggle('hidden',x.dataset.adminSubgroup!==group));
-  await openAdminTab(group==='orders'?'overview':'students');
+  await openAdminTab(group==='orders'?'overview':group==='management'?'students':'wallet-balances');
 }));
 
 async function refresh(){
