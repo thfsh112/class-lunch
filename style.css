@@ -81,7 +81,7 @@
   overflow:visible!important;
 }
 .admin-subtabs[data-admin-subgroup="orders"]{
-  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
 }
 .admin-subtabs[data-admin-subgroup="management"]{
   grid-template-columns:repeat(4,minmax(0,1fr))!important;
@@ -305,4 +305,18 @@
     max-height:88vh;
     padding:16px;
   }
+}
+
+
+/* Consolidated unpaid orders */
+.unpaid-day-group{margin-top:16px;padding-top:14px;border-top:1px solid #eadbd4}
+.unpaid-day-group:first-child{margin-top:8px;border-top:0}
+.unpaid-day-group .unpaid-list{display:grid;grid-template-columns:1fr;gap:10px}
+.unpaid-day-group .history-row{grid-template-columns:1fr auto}
+.unpaid-day-group .actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:640px){
+  .admin-subtabs[data-admin-subgroup="orders"]{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+  .admin-subtabs[data-admin-subgroup="orders"] .tab{font-size:12px;padding-left:3px;padding-right:3px}
+  .unpaid-day-group .history-row{grid-template-columns:1fr}
+  .unpaid-day-group .actions{justify-content:space-between}
 }
