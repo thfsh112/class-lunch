@@ -84,7 +84,7 @@
   grid-template-columns:repeat(5,minmax(0,1fr))!important;
 }
 .admin-subtabs[data-admin-subgroup="management"]{
-  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
 }
 .admin-subtabs .tab{
   width:100%;
@@ -186,7 +186,7 @@
 /* Money flow subtabs: four equal columns */
 .admin-subtabs[data-admin-subgroup="money"]:not(.hidden){
   display:grid!important;
-  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
   gap:8px!important;
   overflow:visible!important;
 }
@@ -199,7 +199,7 @@
 @media(max-width:640px){
   .admin-subtabs[data-admin-subgroup="money"]:not(.hidden){
     display:grid!important;
-    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    grid-template-columns:repeat(5,minmax(0,1fr))!important;
     overflow:visible!important;
   }
   .admin-subtabs[data-admin-subgroup="money"] .tab{
@@ -375,4 +375,40 @@
   .wallet-payall-grid{gap:10px}
   .wallet-payall-card{min-height:92px;padding:14px}
   .wallet-payall-card b{font-size:21px}
+}
+
+
+/* Admin pending count badges */
+.badge-tab{
+  position:relative;
+}
+.count-badge{
+  position:absolute;
+  top:-7px;
+  right:-6px;
+  min-width:20px;
+  height:20px;
+  padding:0 5px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#d64545;
+  color:#fff;
+  border:2px solid #fff;
+  font-size:11px;
+  font-weight:800;
+  line-height:1;
+  box-sizing:border-box;
+  z-index:3;
+}
+.count-badge.hidden{
+  display:none!important;
+}
+@media(max-width:640px){
+  .admin-subtabs[data-admin-subgroup="money"] .tab{
+    font-size:11px;
+    padding-left:2px;
+    padding-right:2px;
+  }
 }
