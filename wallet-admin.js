@@ -58,7 +58,7 @@
       if(!confirm('確定由管理端對 99 號發起結清？'))return;
       const {error}=await db.rpc('class_lunch_wallet_admin_start_settlement',{p_student_id:btn.dataset.walletSettleStart});
       if(error)return toast('發起結清失敗：'+error.message);
-      toast('已發起結清，等待學生最終確認');
+      toast('已發起結清，等待學生第一次確認');
       await Promise.all([loadWalletBalances(),loadWalletSettlements()]);
     }));
 
