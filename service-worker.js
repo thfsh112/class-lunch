@@ -9,6 +9,7 @@ const APP_SHELL=[
   "./app.js?v=20261005-76",
   "./wallet.js?v=20261005-76",
   "./admin.js?v=20261005-76",
+  "./wallet-admin.js?v=20261005-76",
   "./pwa.js?v=20261005-76",
   "./manifest.webmanifest?v=20261005-76",
   "./icon-192.png?v=20261005-76",
