@@ -1,5 +1,5 @@
 (()=>{
-  const DISPLAY_VERSION="1.59";
+  const DISPLAY_VERSION="1.60";
   window.CLASS_LUNCH_APP_VERSION=DISPLAY_VERSION;
   async function forceClassLunchUpdate(triggerButton=null){
     if(triggerButton?.disabled)return;
@@ -53,7 +53,7 @@
   async function registerPwa(){
     try{
       await cleanupOldRegistrations();
-      let reg=await navigator.serviceWorker.register("/class-lunch/service-worker.js?v=20261005-67",{scope:"/class-lunch/",updateViaCache:"none"});
+      let reg=await navigator.serviceWorker.register("/class-lunch/service-worker.js?v=20261005-68",{scope:"/class-lunch/",updateViaCache:"none"});
       await navigator.serviceWorker.ready;
       try{await reg.update()}catch{}
       window.CLASS_LUNCH_PWA_STATUS={supported:true,ready:true,error:null,registration:reg};
