@@ -56,16 +56,25 @@ $('testSeat99PushBtn')?.addEventListener('click',async()=>{
       toast('99 登入狀態已失效，請重新登入');
       return;
     }
-    const{data,error}=await db.functions.invoke('class-lunch-push',{
-      body:{action:'test_seat99'},
-      headers:{Authorization:'Bearer '+session.access_token}
+
+    const response=await fetch(APP_CONFIG.supabaseUrl+'/functions/v1/class-lunch-push',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey':APP_CONFIG.publishableKey,
+        'Authorization':'Bearer '+session.access_token
+      },
+      body:JSON.stringify({action:'test_seat99'})
     });
-    if(error||data?.error){
-      const reason=data?.error||error?.message||'unknown_error';
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||data?.error){
+      const reason=data?.error||('HTTP '+response.status);
       return toast('測試通知失敗：'+reason);
     }
     if(data?.skipped)return toast('沒有可用的 99 推播裝置');
     toast('已送出 '+Number(data?.sent||0)+' 則 99 測試通知');
+  }catch(error){
+    toast('測試通知失敗：'+String(error?.message||error));
   }finally{
     btn.disabled=false;
     btn.textContent='發送 99 測試通知';
