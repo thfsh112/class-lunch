@@ -26,7 +26,25 @@ function renderAdminNightEgg(){
   el.textContent=active?'這個時間還在管便當，便當之神會記得你的。':'';
   el.classList.toggle('hidden',!active);
 }
-async function isAdmin(){const{data:{user}}=await db.auth.getUser();if(!user)return false;const{data}=await db.from('admin_users').select('email').eq('email',user.email).maybeSingle();return!!data}
+async function isAdmin(){
+  const{data:{session}}=await db.auth.getSession();
+  if(!session?.user)return false;
+  const{data:self,error}=await db.from('students')
+    .select('seat_number,active')
+    .eq('auth_user_id',session.user.id)
+    .maybeSingle();
+  return !error&&!!self?.active&&Number(self.seat_number)===99;
+}
+async function hasActiveAdminGate(){
+  if(!adminGatePassed)return false;
+  const{data,error}=await db.functions.invoke('class-lunch-admin-login',{body:{action:'status'}});
+  const active=!error&&data?.ok&&data?.active===true;
+  if(!active){
+    adminGatePassed=false;
+    localStorage.removeItem('class-lunch-admin-gate');
+  }
+  return active;
+}
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
   const username=$('adminUsername').value.trim(),password=$('password').value;
@@ -52,6 +70,7 @@ $('loginForm').addEventListener('submit',async e=>{
   await refresh();
 });
 $('logoutBtn').addEventListener('click',async()=>{
+  try{await db.functions.invoke('class-lunch-admin-login',{body:{action:'logout'}})}catch{}
   adminGatePassed=false;
   localStorage.removeItem('class-lunch-admin-gate');
   await db.auth.signOut({scope:'local'});
@@ -117,7 +136,8 @@ document.querySelectorAll('[data-admin-group]').forEach(b=>b.addEventListener('c
 
 async function refresh(){
   const adminIdentity=await isAdmin();
-  const ok=adminIdentity&&adminGatePassed;
+  const gateActive=adminIdentity?await hasActiveAdminGate():false;
+  const ok=adminIdentity&&gateActive;
   $('loginBox').classList.toggle('hidden',ok);
   $('adminApp').classList.toggle('hidden',!ok);
   $('loginStatus').textContent=ok?'已登入管理者':adminIdentity?'99 號已登入，請輸入管理帳密。':'請先在首頁登入 99 號。';
