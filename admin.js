@@ -123,6 +123,7 @@ async function openAdminTab(tab){
   if(tab==='changes')await loadOrderChanges();
   if(tab==='history')await loadHistoryOrders();
   if(tab==='backups')await loadBackups();
+  if(tab==='unpaid')await loadUnpaidOrders();
 }
 
 document.querySelectorAll('.tab[data-tab]').forEach(b=>b.addEventListener('click',()=>openAdminTab(b.dataset.tab)));
@@ -546,10 +547,71 @@ async function loadHistoryOrders(){
     return '<details class="history-pack"><summary><span><b>'+esc(s.meal_date+' '+(s.menu_templates?.name||'菜單'))+'</b><small>'+rows.length+' 筆 · 已付款 '+paid+' · 未付款 '+(rows.length-paid)+'</small></span><strong>'+money(total)+'</strong></summary><div class="history-pack-orders">'+body+'</div></details>';
   }).join('');
 }
+async function loadUnpaidOrders(){
+  const box=$('allUnpaidList'),summary=$('allUnpaidSummary');
+  if(!box||!summary||!adminGatePassed)return;
+  box.innerHTML='<div class="loading">載入中…</div>';
+  const {data,error}=await db.rpc('class_lunch_admin_unpaid_orders');
+  if(error){box.innerHTML='<div class="loading">讀取失敗</div>';return toast('讀取未付款名單失敗：'+error.message)}
+  const rows=data||[];
+  const totalDue=rows.reduce((a,x)=>a+Number(x.amount_due||0),0);
+  summary.innerHTML=
+    '<div class="stat"><small>未付款筆數</small><b>'+rows.length+'</b></div>'+
+    '<div class="stat"><small>待收金額</small><b>'+money(totalDue)+'</b></div>';
+
+  if(!rows.length){
+    box.innerHTML='<div class="all-paid">✓ 目前沒有未付款訂單</div>';
+    return;
+  }
+
+  const todayStr=today();
+  const addDay=(date,days)=>{
+    const d=new Date(date+'T12:00:00+08:00');
+    d.setUTCDate(d.getUTCDate()+days);
+    return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+  };
+  const tomorrow=addDay(todayStr,1);
+  const grouped=new Map();
+  for(const row of rows){
+    const key=row.meal_date||'未指定日期';
+    if(!grouped.has(key))grouped.set(key,[]);
+    grouped.get(key).push(row);
+  }
+
+  box.innerHTML=[...grouped.entries()].map(([date,items])=>{
+    const label=date===todayStr?'今天 · '+date:date===tomorrow?'明天 · '+date:(date<todayStr?'逾期 · '+date:date);
+    const dayTotal=items.reduce((a,x)=>a+Number(x.amount_due||0),0);
+    return '<section class="unpaid-day-group">'+
+      '<div class="item-stats-head"><h3>'+esc(label)+'</h3><span>'+items.length+' 筆 · '+money(dayTotal)+'</span></div>'+
+      '<div class="unpaid-list">'+items.map(x=>
+        '<article class="history-row">'+
+          '<div class="history-main">'+
+            '<div class="history-title"><b>'+esc(x.seat_number+'號 '+(x.name||''))+'</b><span>'+esc(x.menu_name||'')+'</span></div>'+
+            '<div class="history-items">'+esc(x.item_name||'未記錄品項')+(x.note?' · 備註：'+esc(x.note):'')+'</div>'+
+            '<small>訂單 '+money(x.order_total)+(Number(x.onsite_received||0)>0?' · 已收 '+money(x.onsite_received):'')+(x.unresolved_market_price?' · 尚有時價未定':'')+'</small>'+
+          '</div>'+
+          '<div class="actions"><strong class="history-price">'+money(x.amount_due)+(x.unresolved_market_price?' ＋ 時價':'')+'</strong> '+
+            '<button class="small-btn" type="button" data-unpaid-pay="'+x.order_id+'">標記付款</button></div>'+
+        '</article>'
+      ).join('')+'</div>'+
+    '</section>';
+  }).join('');
+
+  box.querySelectorAll('[data-unpaid-pay]').forEach(btn=>btn.addEventListener('click',async()=>{
+    btn.disabled=true;
+    try{
+      await window.togglePaid(Number(btn.dataset.unpaidPay),true);
+      await loadUnpaidOrders();
+    }finally{btn.disabled=false}
+  }));
+}
+window.loadUnpaidOrders=loadUnpaidOrders;
+$('refreshUnpaidBtn')?.addEventListener('click',loadUnpaidOrders);
+
 async function loadOverview(){
   const id=Number($('overviewSession').value);if(!id)return;
   const s=sessions.find(x=>x.id===id),legacy=s?.legacy_menu_id||-1;
-  const{data:os,error}=await db.from('orders').select('id,student_id,student_name,item_name,unit_price,note,paid,quantity').or('meal_session_id.eq.'+id+',menu_id.eq.'+legacy);
+  const{data:os,error}=await db.from('orders').select('id,student_id,student_name,item_name,unit_price,note,paid,quantity,payment_method,onsite_received,onsite_balance_due,paid_at').or('meal_session_id.eq.'+id+',menu_id.eq.'+legacy);
   if(error)return toast(error.message);
   const list=os||[],paid=list.filter(o=>o.paid).length,total=list.reduce((a,o)=>a+Number(o.unit_price||0)*Number(o.quantity||1),0);
   $('statOrders').textContent=list.length;$('statPaid').textContent=paid;$('statUnpaidCount').textContent=list.length-paid;
@@ -633,10 +695,13 @@ async function loadOverview(){
   const seats=[0,...Array.from({length:35},(_,i)=>i+1),99];
   $('seatPayments').innerHTML='<div class="seat-grid">'+seats.map(n=>{
     const o=bySeat.get(n),st=students.find(s=>s.seat_number===n),hasMarket=o&&marketByOrder.has(o.id),unresolved=o&&unresolvedOrders.has(o.id);
-    return '<div class="seat-card '+(!o?'seat-empty':o.paid?'seat-paid':'seat-unpaid')+'"><b>'+n+'號'+(st?.name?' '+esc(st.name):'')+'</b><span>'+(!o?'未訂':o.paid?'✓ 已付款':'未付款')+'</span>'+
-      (o?'<strong>'+esc(o.item_name)+' · '+money(o.unit_price)+(unresolved?' ＋ 時價':'')+'</strong><small>'+esc(o.note||'')+'</small><small class="easter-note">'+esc(adminPaymentEaster(!!o.paid,o.unit_price))+'</small><div>'+
+    const refundDue=o&&o.payment_method==='onsite'&&Number(o.onsite_balance_due||0)<0?Math.abs(Number(o.onsite_balance_due||0)):0;
+    const collectDue=o&&o.payment_method==='onsite'&&Number(o.onsite_balance_due||0)>0?Number(o.onsite_balance_due||0):0;
+    return '<div class="seat-card '+(!o?'seat-empty':o.paid?'seat-paid':'seat-unpaid')+'"><b>'+n+'號'+(st?.name?' '+esc(st.name):'')+'</b><span>'+(!o?'未訂':refundDue?'應退款 '+money(refundDue):o.paid?'✓ 已付款':collectDue?'待收 '+money(collectDue):'未付款')+'</span>'+
+      (o?'<strong>'+esc(o.item_name)+' · '+money(o.unit_price)+(unresolved?' ＋ 時價':'')+'</strong><small>'+esc(o.note||'')+'</small>'+(o.paid_at?'<small>實收時間 '+esc(fmtAdminTime(o.paid_at))+'</small>':'')+'<small class="easter-note">'+esc(adminPaymentEaster(!!o.paid,o.unit_price))+'</small><div>'+
       (hasMarket?'<button class="small-btn market-btn" onclick="openMarketPriceDialog('+o.id+','+n+')">設定時價</button> ':'')+
-      '<button class="small-btn" onclick="togglePaid('+o.id+','+(!o.paid)+')">'+(o.paid?'改未付':'標記付款')+'</button> <button class="small-btn danger" onclick="deleteOrder('+o.id+')">刪除</button></div>':'')+'</div>';
+      (refundDue?'<button class="small-btn" onclick="refundOnsiteDifference('+o.id+')">退還差額</button> ':'<button class="small-btn" onclick="togglePaid('+o.id+','+(!o.paid)+')">'+(o.paid?'改未付':'標記付款')+'</button> ')+
+      '<button class="small-btn danger" onclick="deleteOrder('+o.id+')">刪除</button></div>':'')+'</div>';
   }).join('')+'</div>';
 }
 async function copyOverviewStats(){
@@ -863,6 +928,7 @@ function scheduleAdminRealtimeRefresh(kind){
       await loadSessions();
     }else{
       await loadOverview();
+      if(!$('tab-unpaid')?.classList.contains('hidden'))await loadUnpaidOrders();
     }
   },350);
 }
