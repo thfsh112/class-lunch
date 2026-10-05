@@ -181,7 +181,16 @@
       byId('walletTopupList').innerHTML=topups.length?topups.map(x=>`
         <article class="history-row">
           <div class="history-main"><b>儲值申請 ${money(x.requested_amount)}</b><small>${topupStatus(x.status)}${x.actual_amount!=null?' · 實收 '+money(x.actual_amount):''}</small></div>
+          ${x.status==='pending'?'<div><button class="small-btn danger" type="button" data-cancel-topup="'+x.id+'">取消申請</button></div>':''}
         </article>`).join(''):'';
+
+      byId('walletTopupList')?.querySelectorAll('[data-cancel-topup]').forEach(btn=>btn.addEventListener('click',async()=>{
+        if(!confirm('確定取消這筆儲值申請？'))return;
+        const {error}=await db.rpc('class_lunch_wallet_cancel_topup',{p_request_id:Number(btn.dataset.cancelTopup)});
+        if(error)return toast('取消儲值申請失敗：'+error.message);
+        toast('儲值申請已取消');
+        await refreshWallet();
+      }));
 
       renderSettlement(settleRes.data);
       if(byId('orderDialog')?.open)refreshCheckout();
@@ -209,6 +218,19 @@
       return;
     }
     area.innerHTML='<div class="order-status pending"><b>'+settlementStatus(req.status)+'</b><small>申請時餘額：'+money(req.balance_at_request)+'</small></div>';
+    if(req.status==='admin_started'){
+      area.insertAdjacentHTML('beforeend',`
+        <form id="walletAdminStartedConfirmForm">
+          <label>座號<input id="walletAdminStartedSeat" type="number" value="99" required></label>
+          <label>密碼<input id="walletAdminStartedPassword" type="password" required autocomplete="current-password"></label>
+          <div class="dialog-actions"><button class="primary" type="submit">確認管理端發起結清</button></div>
+        </form>`);
+      byId('walletAdminStartedConfirmForm')?.addEventListener('submit',confirmAdminStartedSettlement);
+    }
+    if(['student_requested','admin_started','admin_confirmed'].includes(req.status)){
+      area.insertAdjacentHTML('beforeend','<div class="dialog-actions"><button id="walletSettlementCancelBtn" class="ghost danger" type="button">取消結清</button></div>');
+      byId('walletSettlementCancelBtn')?.addEventListener('click',()=>cancelSettlement(req.id));
+    }
     if(req.status==='admin_confirmed'){
       area.insertAdjacentHTML('beforeend',`
         <form id="walletSettlementFinalForm">
@@ -239,6 +261,29 @@
       toast('結清申請已送出，等待管理端確認');
       await refreshWallet();
     }catch(error){toast('結清申請失敗：'+error.message)}
+  }
+
+  async function confirmAdminStartedSettlement(e){
+    e.preventDefault();
+    const seat=Number(byId('walletAdminStartedSeat').value),password=byId('walletAdminStartedPassword').value;
+    try{
+      await reauth(seat,password);
+      const {data:req,error:reqError}=await db.rpc('class_lunch_wallet_settlement_my');
+      if(reqError)throw reqError;
+      if(!req?.id)throw new Error('找不到結清申請');
+      const {error}=await db.rpc('class_lunch_wallet_student_confirm_admin_settlement',{p_request_id:req.id,p_seat:seat});
+      if(error)throw error;
+      toast('已確認管理端發起的結清，等待管理端再次確認');
+      await refreshWallet();
+    }catch(error){toast('確認失敗：'+error.message)}
+  }
+
+  async function cancelSettlement(id){
+    if(!confirm('確定取消目前的結清流程？'))return;
+    const {error}=await db.rpc('class_lunch_wallet_cancel_settlement',{p_request_id:Number(id)});
+    if(error)return toast('取消結清失敗：'+error.message);
+    toast('結清流程已取消');
+    await refreshWallet();
   }
 
   async function finalSettlement(e){
