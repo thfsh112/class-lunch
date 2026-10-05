@@ -310,7 +310,7 @@ async function watchNotificationPermission(){
   }
 }
 async function refreshPushStatus(){
-  const status=$('pushStatusText'),enable=$('enablePushBtn'),disable=$('disablePushBtn');
+  const status=$('pushStatusText'),enable=$('enablePushBtn'),disable=$('disablePushBtn'),rebuild=$('rebuildPushBtn');
   if(!status||!enable||!disable)return;
   if(!('Notification' in window)||!('PushManager' in window)||!('serviceWorker' in navigator)){
     status.textContent='此瀏覽器不支援系統推播通知。';
@@ -320,11 +320,11 @@ async function refreshPushStatus(){
   const sub=await getCurrentPushSubscription();
   if(Notification.permission==='granted'&&sub&&devicePushOptedIn()){
     status.textContent='通知已開啟（僅此裝置）。';
-    enable.classList.add('hidden');disable.classList.remove('hidden');
+    enable.classList.add('hidden');disable.classList.remove('hidden');rebuild?.classList.remove('hidden');
     try{await upsertCurrentPushSubscription(sub)}catch(error){console.warn('push_sync_failed',error)}
     return;
   }
-  enable.classList.remove('hidden');disable.classList.add('hidden');
+  enable.classList.remove('hidden');disable.classList.add('hidden');rebuild?.classList.add('hidden');
   if(Notification.permission==='denied'){
     status.textContent='通知權限已被封鎖，請到瀏覽器或系統設定重新允許。';
     enable.disabled=true;
@@ -377,6 +377,36 @@ async function enablePushNotifications(){
     toast(readable);
   }
 }
+async function rebuildPushNotifications(){
+  if(!('Notification' in window)||Notification.permission!=='granted')return toast('請先允許通知');
+  const btn=$('rebuildPushBtn');
+  if(btn){btn.disabled=true;btn.textContent='重建中…';}
+  try{
+    const reg=await getPushRegistration();
+    if(!reg)throw new Error('service_worker_missing');
+    const oldSub=await reg.pushManager.getSubscription();
+    if(oldSub){
+      try{
+        await db.functions.invoke('class-lunch-push',{body:{action:'unsubscribe',endpoint:oldSub.endpoint}});
+      }catch(error){console.warn('push_rebuild_server_cleanup_failed',error)}
+      await oldSub.unsubscribe().catch(()=>false);
+    }
+    const newSub=await reg.pushManager.subscribe({
+      userVisibleOnly:true,
+      applicationServerKey:urlBase64ToUint8Array(PUSH_VAPID_PUBLIC_KEY)
+    });
+    setDevicePushOptIn(true);
+    await upsertCurrentPushSubscription(newSub);
+    await refreshPushStatus();
+    toast('已重新建立這支裝置的推播連線');
+  }catch(error){
+    console.error('push_rebuild_failed',error);
+    toast('重建推播失敗：'+String(error?.message||error));
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='重建推播連線';}
+  }
+}
+
 async function disablePushNotifications(){
   setDevicePushOptIn(false);
   let cleanupFailed=false;
@@ -790,3 +820,4 @@ refreshInstallStatus();
 setTimeout(refreshInstallStatus,32000);
 watchNotificationPermission();
 refresh();
+$('rebuildPushBtn')?.addEventListener('click',rebuildPushNotifications);
