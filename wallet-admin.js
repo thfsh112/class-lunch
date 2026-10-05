@@ -46,7 +46,11 @@
         '<b>'+x.seat_number+'號 '+esc(x.name||'')+'</b>'+
         '<span>'+walletStatusLabel(x.status)+(enabled?' · 測試開放':' · 尚未開放')+'</span>'+
         '<strong>'+money(x.balance)+'</strong>'+
-        (enabled&&x.status==='active'?'<div><button class="small-btn danger" type="button" data-wallet-settle-start="'+x.student_id+'">發起結清</button></div>':'')+
+        (enabled&&x.status==='active'
+          ?'<div><button class="small-btn danger" type="button" data-wallet-settle-start="'+x.student_id+'">發起結清</button></div>'
+          :enabled&&x.status==='settled'
+            ?'<div><button class="small-btn" type="button" data-wallet-rebuild="'+x.student_id+'">重建錢包</button></div>'
+            :'')+
       '</div>';
     }).join('')+'</div>':'<div class="loading">目前沒有錢包資料</div>';
 
@@ -56,6 +60,14 @@
       if(error)return toast('發起結清失敗：'+error.message);
       toast('已發起結清，等待學生最終確認');
       await Promise.all([loadWalletBalances(),loadWalletSettlements()]);
+    }));
+
+    box.querySelectorAll('[data-wallet-rebuild]').forEach(btn=>btn.addEventListener('click',async()=>{
+      if(!confirm('確定重建這個已結清錢包？\n重建後餘額從 $0 開始，舊流水與舊結清紀錄會保留。'))return;
+      const {error}=await db.rpc('class_lunch_wallet_admin_rebuild',{p_student_id:btn.dataset.walletRebuild});
+      if(error)return toast('重建錢包失敗：'+error.message);
+      toast('錢包已重建，餘額從 $0 開始');
+      await Promise.all([loadWalletBalances(),loadWalletSettlements(),loadWalletLedger()]);
     }));
   }
 
