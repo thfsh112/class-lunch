@@ -173,3 +173,11 @@
 .history-pack-order small{margin-top:3px;color:#927d74;font-size:12px;line-height:1.5}
 .history-pack-order>strong{white-space:nowrap;font-size:13px}
 @media(max-width:640px){.history-pack summary,.history-pack-order{align-items:flex-start;flex-direction:column}.history-pack summary>strong,.history-pack-order>strong{white-space:normal}}
+
+/* Harmless lunch easter eggs */
+.easter-subtitle{margin:-2px 0 8px;color:#9b766c;font-size:13px;font-weight:700;opacity:.78}
+.easter-note{display:block!important;margin-top:5px!important;color:#9a8178!important;font-size:11px!important;font-weight:600;font-style:italic;opacity:.82}
+.loyalty-badge{background:#f1e7ff!important;color:#76579a!important;border:1px solid #dfcff3}
+.lunch-empty-egg b,.lunch-empty-egg span{display:block}
+.lunch-empty-egg b{color:#6f554d;margin-bottom:5px}
+.admin-night-egg{display:inline-block;margin:6px 0 0;padding:5px 9px;border:1px dashed #d9b7a8;border-radius:999px;color:#8f675b;font-size:12px;font-weight:700;background:#fff8f2}
