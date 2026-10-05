@@ -23,30 +23,43 @@
       dialog.innerHTML=`
         <div class="history-shell">
           <div class="dialog-head"><div><small>WALLET TEST</small><h2>餐費錢包</h2></div><button type="button" class="close-dialog" id="walletCloseBtn">×</button></div>
-          <div class="stats">
-            <div class="stat"><small>目前餘額</small><b id="walletBalance">$0</b></div>
-            <div class="stat"><small>狀態</small><b id="walletStatus">—</b></div>
+          <div class="admin-tabs wallet-student-tabs">
+            <button class="tab active" type="button" data-wallet-tab="overview">餘額／儲值</button>
+            <button class="tab" type="button" data-wallet-tab="ledger">交易紀錄</button>
+            <button class="tab" type="button" data-wallet-tab="settlement">結清帳號</button>
           </div>
-          <div id="walletNegativeHint" class="hint hidden">目前餘額為負數，暫時不能使用錢包結帳；現場結帳仍可使用。</div>
-          <div class="account-divider"></div>
-          <h3>申請儲值</h3>
-          <form id="walletTopupForm">
-            <label>想儲值的金額<input id="walletTopupAmount" type="number" min="1" max="100000" step="1" inputmode="numeric" required></label>
-            <div class="dialog-actions"><button class="primary" type="submit">送出儲值申請</button></div>
-          </form>
-          <div id="walletTopupList" class="history-list"></div>
-          <div class="account-divider"></div>
-          <div class="section-head"><h3>交易紀錄</h3><button id="walletRefreshBtn" class="small-btn" type="button">重新整理</button></div>
-          <div id="walletTxList" class="history-list"></div>
-          <div class="account-divider"></div>
-          <h3>結清</h3>
-          <p class="hint">餘額為負數時不能結清。結清申請送出後，必須經過管理端確認、學生最終確認，再由管理端正式完成。</p>
-          <div id="walletSettlementArea"></div>
+
+          <section id="walletTab-overview" class="wallet-tab-page">
+            <div class="stats">
+              <div class="stat"><small>目前餘額</small><b id="walletBalance">$0</b></div>
+              <div class="stat"><small>狀態</small><b id="walletStatus">—</b></div>
+            </div>
+            <div id="walletNegativeHint" class="hint hidden">目前餘額為負數，暫時不能使用錢包結帳；現場結帳仍可使用。</div>
+            <div class="account-divider"></div>
+            <h3>申請儲值</h3>
+            <form id="walletTopupForm">
+              <label>想儲值的金額<input id="walletTopupAmount" type="number" min="1" max="100000" step="1" inputmode="numeric" required></label>
+              <div class="dialog-actions"><button class="primary" type="submit">送出儲值申請</button></div>
+            </form>
+            <div id="walletTopupList" class="history-list"></div>
+          </section>
+
+          <section id="walletTab-ledger" class="wallet-tab-page hidden">
+            <div class="section-head"><h3>交易紀錄</h3><button id="walletRefreshBtn" class="small-btn" type="button">重新整理</button></div>
+            <div id="walletTxList" class="history-list"></div>
+          </section>
+
+          <section id="walletTab-settlement" class="wallet-tab-page hidden">
+            <h3>結清帳號</h3>
+            <p class="hint">餘額為負數時不能結清。結清申請送出後，必須經過管理端確認、學生最終確認，再由管理端正式完成。</p>
+            <div id="walletSettlementArea"></div>
+          </section>
         </div>`;
       document.body.appendChild(dialog);
       byId('walletCloseBtn').addEventListener('click',()=>dialog.close());
       byId('walletRefreshBtn').addEventListener('click',refreshWallet);
       byId('walletTopupForm').addEventListener('submit',submitTopup);
+      dialog.querySelectorAll('[data-wallet-tab]').forEach(btn=>btn.addEventListener('click',()=>switchWalletTab(btn.dataset.walletTab)));
     }
 
     if(!byId('walletPaymentBox')){
@@ -66,6 +79,12 @@
         form.insertBefore(box,actions);
       }
     }
+  }
+
+  function switchWalletTab(tab){
+    document.querySelectorAll('[data-wallet-tab]').forEach(btn=>btn.classList.toggle('active',btn.dataset.walletTab===tab));
+    document.querySelectorAll('.wallet-tab-page').forEach(page=>page.classList.add('hidden'));
+    byId('walletTab-'+tab)?.classList.remove('hidden');
   }
 
   async function refreshVisibility(){
@@ -255,6 +274,7 @@
 
   async function openWallet(){
     if(!isWalletTester())return;
+    switchWalletTab('overview');
     byId('walletDialog').showModal();
     await refreshWallet();
   }
