@@ -35,6 +35,19 @@
               <div class="stat"><small>狀態</small><b id="walletStatus">—</b></div>
             </div>
             <div id="walletNegativeHint" class="hint hidden">目前餘額為負數，暫時不能使用錢包結帳；現場結帳仍可使用。</div>
+            <div class="wallet-payall-grid">
+              <div class="wallet-payall-card">
+                <small>尚未付款</small>
+                <b id="walletUnpaidTotal">$0</b>
+                <span id="walletUnpaidCount">0 筆</span>
+              </div>
+              <button id="walletPayAllBtn" class="wallet-payall-card wallet-payall-action" type="button" disabled>
+                <small>一次付清</small>
+                <b id="walletPayAllText">沒有待付款</b>
+                <span id="walletPayAllAfter">—</span>
+              </button>
+            </div>
+            <div id="walletPayAllHint" class="hint hidden"></div>
             <div class="account-divider"></div>
             <h3>申請儲值</h3>
             <form id="walletTopupForm">
@@ -59,6 +72,7 @@
       byId('walletCloseBtn').addEventListener('click',()=>dialog.close());
       byId('walletRefreshBtn').addEventListener('click',refreshWallet);
       byId('walletTopupForm').addEventListener('submit',submitTopup);
+      byId('walletPayAllBtn').addEventListener('click',payAllUnpaid);
       dialog.querySelectorAll('[data-wallet-tab]').forEach(btn=>btn.addEventListener('click',()=>switchWalletTab(btn.dataset.walletTab)));
     }
 
@@ -157,18 +171,35 @@
   async function refreshWallet(){
     if(!isWalletTester())return;
     try{
-      const [wRes,txRes,topupRes,settleRes]=await Promise.all([
+      const [wRes,txRes,topupRes,settleRes,unpaidRes]=await Promise.all([
         db.rpc('class_lunch_wallet_me'),
         db.rpc('class_lunch_wallet_transactions_my',{p_limit:100}),
         db.rpc('class_lunch_wallet_topups_my'),
-        db.rpc('class_lunch_wallet_settlement_my')
+        db.rpc('class_lunch_wallet_settlement_my'),
+        db.rpc('class_lunch_wallet_unpaid_summary')
       ]);
-      const err=wRes.error||txRes.error||topupRes.error||settleRes.error;
+      const err=wRes.error||txRes.error||topupRes.error||settleRes.error||unpaidRes.error;
       if(err)throw err;
       walletSnapshot=wRes.data;
       byId('walletBalance').textContent=money(walletSnapshot.balance);
       byId('walletStatus').textContent=walletSnapshot.status==='active'?'使用中':walletSnapshot.status==='settlement_pending'?'結清處理中':'已結清';
       byId('walletNegativeHint').classList.toggle('hidden',Number(walletSnapshot.balance)>=0);
+
+      const unpaid=unpaidRes.data||{};
+      byId('walletUnpaidTotal').textContent=money(Number(unpaid.unpaid_total||0));
+      byId('walletUnpaidCount').textContent=Number(unpaid.unpaid_count||0)+' 筆';
+      const payAllBtn=byId('walletPayAllBtn');
+      payAllBtn.disabled=!unpaid.can_pay_all;
+      payAllBtn.dataset.total=String(Number(unpaid.unpaid_total||0));
+      payAllBtn.dataset.count=String(Number(unpaid.unpaid_count||0));
+      payAllBtn.dataset.after=String(Number(unpaid.balance_after||walletSnapshot.balance||0));
+      byId('walletPayAllText').textContent=unpaid.can_pay_all?'立即付款':Number(unpaid.unpaid_count||0)?'暫時不能付款':'沒有待付款';
+      byId('walletPayAllAfter').textContent=Number(unpaid.unpaid_count||0)
+        ?'付款後 '+money(Number(unpaid.balance_after||0))
+        :'目前已付清';
+      const payAllHint=byId('walletPayAllHint');
+      payAllHint.textContent=unpaid.blocked_reason||'';
+      payAllHint.classList.toggle('hidden',!unpaid.blocked_reason);
 
       const txs=txRes.data||[];
       byId('walletTxList').innerHTML=txs.length?txs.map(x=>`
@@ -299,6 +330,29 @@
       toast('已完成學生最終確認，等待管理端正式結清');
       await refreshWallet();
     }catch(error){toast('最終確認失敗：'+error.message)}
+  }
+
+  async function payAllUnpaid(){
+    const btn=byId('walletPayAllBtn');
+    if(!btn||btn.disabled)return;
+    const count=Number(btn.dataset.count||0);
+    const total=Number(btn.dataset.total||0);
+    const after=Number(btn.dataset.after||0);
+    if(!confirm('確定用錢包一次支付 '+count+' 筆未付款訂單，共 '+money(total)+'？\n付款後餘額：'+money(after)))return;
+    btn.disabled=true;
+    const original=byId('walletPayAllText').textContent;
+    byId('walletPayAllText').textContent='付款中…';
+    try{
+      const {data,error}=await db.rpc('class_lunch_wallet_pay_all_unpaid');
+      if(error)throw error;
+      toast('已支付 '+Number(data?.paid_count||count)+' 筆訂單，共 '+money(Number(data?.paid_total||total)));
+      await Promise.all([refreshWallet(),loadSessions()]);
+    }catch(error){
+      toast('一次付清失敗：'+error.message);
+      await refreshWallet().catch(()=>{});
+    }finally{
+      if(byId('walletPayAllText')?.textContent==='付款中…')byId('walletPayAllText').textContent=original;
+    }
   }
 
   async function submitTopup(e){
