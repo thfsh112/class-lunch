@@ -286,6 +286,15 @@
     const n=Number(seat);
     const currentSeat=Number(student?.seat_number);
     if(!Number.isInteger(currentSeat)||n!==currentSeat)throw new Error('座號不正確');
+
+    if(currentSeat===0){
+      const {data,error}=await db.functions.invoke('class-lunch-teacher-login',{body:{account:'tch',password}});
+      if(error||data?.error||!data?.access_token||!data?.refresh_token)throw new Error('帳號或密碼錯誤');
+      const {error:setError}=await db.auth.setSession({access_token:data.access_token,refresh_token:data.refresh_token});
+      if(setError)throw new Error('重新驗證失敗');
+      return;
+    }
+
     const {error}=await db.auth.signInWithPassword({email:internalEmail(n),password:authPassword(password)});
     if(error)throw new Error('座號或密碼錯誤');
   }
