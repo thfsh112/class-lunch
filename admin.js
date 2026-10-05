@@ -14,6 +14,18 @@ function applyDefaultSessionCutoff(force=false){
 }
 let templates=[],sessions=[],students=[],editingTemplateId=null,editingSessionId=null,editingSessionOriginalDate='',editingStudentId=null,menuEditorItems=[],originalMenuItemIds=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null;
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
+function adminPaymentEaster(paid,amount){
+  const value=money(amount);
+  return paid?'錢包已成功瘦身 '+value:'便當宇宙仍記得這筆 '+value;
+}
+function renderAdminNightEgg(){
+  const el=$('adminNightEgg');
+  if(!el)return;
+  const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',hour:'2-digit',hourCycle:'h23'}).format(new Date()));
+  const active=hour>=0&&hour<5;
+  el.textContent=active?'這個時間還在管便當，便當之神會記得你的。':'';
+  el.classList.toggle('hidden',!active);
+}
 async function isAdmin(){const{data:{user}}=await db.auth.getUser();if(!user)return false;const{data}=await db.from('admin_users').select('email').eq('email',user.email).maybeSingle();return!!data}
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
@@ -602,7 +614,7 @@ async function loadOverview(){
   $('seatPayments').innerHTML='<div class="seat-grid">'+seats.map(n=>{
     const o=bySeat.get(n),st=students.find(s=>s.seat_number===n),hasMarket=o&&marketByOrder.has(o.id),unresolved=o&&unresolvedOrders.has(o.id);
     return '<div class="seat-card '+(!o?'seat-empty':o.paid?'seat-paid':'seat-unpaid')+'"><b>'+n+'號'+(st?.name?' '+esc(st.name):'')+'</b><span>'+(!o?'未訂':o.paid?'✓ 已付款':'未付款')+'</span>'+
-      (o?'<strong>'+esc(o.item_name)+' · '+money(o.unit_price)+(unresolved?' ＋ 時價':'')+'</strong><small>'+esc(o.note||'')+'</small><div>'+
+      (o?'<strong>'+esc(o.item_name)+' · '+money(o.unit_price)+(unresolved?' ＋ 時價':'')+'</strong><small>'+esc(o.note||'')+'</small><small class="easter-note">'+esc(adminPaymentEaster(!!o.paid,o.unit_price))+'</small><div>'+
       (hasMarket?'<button class="small-btn market-btn" onclick="openMarketPriceDialog('+o.id+','+n+')">設定時價</button> ':'')+
       '<button class="small-btn" onclick="togglePaid('+o.id+','+(!o.paid)+')">'+(o.paid?'改未付':'標記付款')+'</button> <button class="small-btn danger" onclick="deleteOrder('+o.id+')">刪除</button></div>':'')+'</div>';
   }).join('')+'</div>';
@@ -848,4 +860,4 @@ function stopAdminRealtime(){
   clearTimeout(realtimeTimer);
   if(realtimeChannel){db.removeChannel(realtimeChannel);realtimeChannel=null}
 }
-db.auth.onAuthStateChange(()=>setTimeout(refresh,0));refresh();
+db.auth.onAuthStateChange(()=>setTimeout(refresh,0));renderAdminNightEgg();setInterval(renderAdminNightEgg,60000);refresh();
