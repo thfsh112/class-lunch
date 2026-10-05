@@ -185,10 +185,24 @@
       }
       toast('訂單已刪除');
       await loadOverview();
+      window.loadUnpaidOrders?.().catch(()=>{});
       loadWalletLedger().catch(()=>{});
       loadWalletBalances().catch(()=>{});
     }catch(error){
       toast('刪除失敗：'+error.message);
+    }
+  };
+
+  window.refundOnsiteDifference=async function(id){
+    if(!confirm('確定已實際把差額退還給學生？'))return;
+    try{
+      const {data,error}=await db.rpc('class_lunch_admin_refund_onsite_difference',{p_order_id:id});
+      if(error)throw error;
+      toast('已記錄退款 '+money(data?.refunded||0));
+      await loadOverview();
+      window.loadUnpaidOrders?.().catch(()=>{});
+    }catch(error){
+      toast('退款失敗：'+error.message);
     }
   };
 
