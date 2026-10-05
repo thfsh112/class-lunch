@@ -712,7 +712,7 @@ function renderSessions(){
     state='<div class="order-status '+(o.paid?'paid':'pending')+'"><b>'+(o.paid?'✓ 已付款':'已訂餐 · 未付款')+'</b><div>'+esc(o.item_name)+' · '+money(o.unit_price)+(unresolvedMarket?' ＋ 時價':'')+'</div><small>'+esc(o.note||'無備註')+'</small><small class="easter-note">'+esc(paymentEaster(!!o.paid,o.unit_price))+'</small></div>';
     if(!closed&&!o.paid)state+='<div class="order-actions"><button class="primary" onclick="openOrderEditor('+s.id+')">修改訂單</button><button class="small-btn danger" onclick="cancelOrder('+s.id+')">取消訂單</button></div>';
   }else if(closed){
-    state='<div class="closed-order">此訂餐已截止</div>';
+    state='<div class="closed-order">詠丞小弟弟告訴你：沒點餐還想看你自己吃甚麼？</div>';
   }else{
     state='<div class="order-status empty"><b>尚未訂餐</b><span>選好餐點後再送出即可。</span></div><button class="primary full-btn" onclick="openOrderEditor('+s.id+')">開始訂餐</button>';
   }
