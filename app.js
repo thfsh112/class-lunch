@@ -604,6 +604,7 @@ async function refresh(){
   if(!session){
     stopStudentRealtime();
     student=null;
+    window.dispatchEvent(new Event('class-lunch-student-ready'));
     detachCurrentPushBinding();
     $('loginBox').classList.remove('hidden');$('setupBox').classList.add('hidden');$('studentApp').classList.add('hidden');
     $('heroAccount').classList.add('hidden');$('logoutBtn').classList.add('hidden');$('notifyBtn').classList.add('hidden');$('accountBtn').classList.add('hidden');$('historyBtn').classList.add('hidden');$('adminLink').classList.add('hidden');
@@ -622,7 +623,9 @@ async function refresh(){
     return;
   }
   if(!s||!s.active){await db.auth.signOut();student=null;toast('此學生帳號目前無法使用');return refresh()}
-  student=s;startStudentRealtime();watchNotificationPermission();$('loginBox').classList.add('hidden');$('heroAccount').classList.remove('hidden');$('logoutBtn').classList.remove('hidden');$('historyBtn').classList.remove('hidden');
+  student=s;
+  window.dispatchEvent(new Event('class-lunch-student-ready'));
+  startStudentRealtime();watchNotificationPermission();$('loginBox').classList.add('hidden');$('heroAccount').classList.remove('hidden');$('logoutBtn').classList.remove('hidden');$('historyBtn').classList.remove('hidden');
   $('adminLink').classList.toggle('hidden',s.seat_number!==99);
   $('heroIdentity').textContent=s.seat_number+'號 '+(s.name||'');
 
