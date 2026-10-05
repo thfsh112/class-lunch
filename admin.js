@@ -548,16 +548,23 @@ async function loadHistoryOrders(){
   }).join('');
 }
 async function loadUnpaidOrders(){
-  const box=$('allUnpaidList'),summary=$('allUnpaidSummary');
-  if(!box||!summary||!adminGatePassed)return;
+  const box=$('allUnpaidList'),summary=$('allUnpaidSummary'),refundBox=$('allRefundList');
+  if(!box||!summary||!refundBox||!adminGatePassed)return;
   box.innerHTML='<div class="loading">載入中…</div>';
-  const {data,error}=await db.rpc('class_lunch_admin_unpaid_orders');
-  if(error){box.innerHTML='<div class="loading">讀取失敗</div>';return toast('讀取未付款名單失敗：'+error.message)}
-  const rows=data||[];
+  refundBox.innerHTML='<div class="loading">載入中…</div>';
+  const [unpaidRes,refundRes]=await Promise.all([
+    db.rpc('class_lunch_admin_unpaid_orders'),
+    db.rpc('class_lunch_admin_refund_due_orders')
+  ]);
+  if(unpaidRes.error){box.innerHTML='<div class="loading">讀取失敗</div>';return toast('讀取未付款名單失敗：'+unpaidRes.error.message)}
+  if(refundRes.error){refundBox.innerHTML='<div class="loading">讀取失敗</div>';return toast('讀取待退款失敗：'+refundRes.error.message)}
+  const rows=unpaidRes.data||[],refunds=refundRes.data||[];
   const totalDue=rows.reduce((a,x)=>a+Number(x.amount_due||0),0);
+  const totalRefund=refunds.reduce((a,x)=>a+Number(x.refund_due||0),0);
   summary.innerHTML=
     '<div class="stat"><small>未付款筆數</small><b>'+rows.length+'</b></div>'+
-    '<div class="stat"><small>待收金額</small><b>'+money(totalDue)+'</b></div>';
+    '<div class="stat"><small>待收金額</small><b>'+money(totalDue)+'</b></div>'+
+    '<div class="stat"><small>今天待退款</small><b>'+money(totalRefund)+'</b></div>';
 
   if(!rows.length){
     box.innerHTML='<div class="all-paid">✓ 目前沒有未付款訂單</div>';
@@ -602,6 +609,31 @@ async function loadUnpaidOrders(){
     try{
       await window.togglePaid(Number(btn.dataset.unpaidPay),true);
       await loadUnpaidOrders();
+    }finally{btn.disabled=false}
+  }));
+
+  refundBox.innerHTML=refunds.length?refunds.map(x=>
+    '<article class="history-row">'+
+      '<div class="history-main">'+
+        '<div class="history-title"><b>'+esc(x.seat_number+'號 '+(x.name||''))+'</b><span>'+esc(x.order_date||'')+'</span></div>'+
+        '<div class="history-items">'+esc(x.item_name||'未記錄品項')+(x.note?' · 備註：'+esc(x.note):'')+'</div>'+
+        '<small>訂單 '+money(x.order_total)+' · 已收 '+money(x.onsite_received)+'</small>'+
+      '</div>'+
+      '<div class="actions"><strong class="history-price">應退 '+money(x.refund_due)+'</strong> '+
+        '<button class="small-btn" type="button" data-refund-due="'+x.order_id+'">已退款</button></div>'+
+    '</article>'
+  ).join(''):'<div class="all-paid">✓ 今天沒有待退款差額</div>';
+
+  refundBox.querySelectorAll('[data-refund-due]').forEach(btn=>btn.addEventListener('click',async()=>{
+    if(!confirm('確定已實際把差額退還給學生？'))return;
+    btn.disabled=true;
+    try{
+      const {error}=await db.rpc('class_lunch_admin_refund_onsite_difference',{p_order_id:Number(btn.dataset.refundDue)});
+      if(error)throw error;
+      toast('退款已記錄');
+      await Promise.all([loadUnpaidOrders(),loadOverview()]);
+    }catch(error){
+      toast('退款失敗：'+error.message);
     }finally{btn.disabled=false}
   }));
 }
@@ -782,8 +814,22 @@ $('marketPriceForm').addEventListener('submit',async e=>{
   $('marketPriceDialog').close();toast('時價已更新');await loadOverview();
 });
 
-async function togglePaid(id,n){const{error}=await db.from('orders').update({paid:n}).eq('id',id);if(error)return toast(error.message);toast(n?'已付款':'已改未付款');loadOverview()}
-async function deleteOrder(id){if(!confirm('確定刪除這筆訂單？'))return;const{error}=await db.from('orders').delete().eq('id',id);if(error)return toast(error.message);toast('已刪除');loadOverview()}
+async function togglePaid(id,n){
+  const fn=n?'class_lunch_wallet_admin_mark_onsite_paid':'class_lunch_wallet_admin_mark_unpaid';
+  const {error}=await db.rpc(fn,{p_order_id:id});
+  if(error)return toast((n?'付款失敗：':'改未付款失敗：')+error.message);
+  toast(n?'已付款':'已改未付款');
+  await loadOverview();
+  if(!$('tab-unpaid')?.classList.contains('hidden'))await loadUnpaidOrders();
+}
+async function deleteOrder(id){
+  if(!confirm('確定刪除這筆訂單？\n若有付款紀錄會先建立沖銷紀錄。'))return;
+  const{error}=await db.rpc('class_lunch_wallet_admin_delete_order',{p_order_id:id});
+  if(error)return toast('刪除失敗：'+error.message);
+  toast('已刪除');
+  await loadOverview();
+  if(!$('tab-unpaid')?.classList.contains('hidden'))await loadUnpaidOrders();
+}
 
 function fmtAdminTime(v){
   return new Date(v).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
