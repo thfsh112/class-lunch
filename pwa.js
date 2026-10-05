@@ -1,6 +1,52 @@
 (()=>{
-  const DISPLAY_VERSION="1.73";
+  const DISPLAY_VERSION="1.74";
   window.CLASS_LUNCH_APP_VERSION=DISPLAY_VERSION;
+  function compareVersions(a,b){
+    const aa=String(a||'').split('.').map(n=>Number(n)||0);
+    const bb=String(b||'').split('.').map(n=>Number(n)||0);
+    const len=Math.max(aa.length,bb.length);
+    for(let i=0;i<len;i++){
+      const diff=(aa[i]||0)-(bb[i]||0);
+      if(diff)return diff;
+    }
+    return 0;
+  }
+
+  async function checkForAppUpdate(){
+    try{
+      const response=await fetch('./version.json?_='+Date.now(),{
+        cache:'no-store',
+        headers:{'Cache-Control':'no-cache'}
+      });
+      if(!response.ok)return;
+      const data=await response.json();
+      const latest=String(data?.version||'').trim();
+      if(!/^\d+(?:\.\d+)*$/.test(latest))return;
+      if(compareVersions(DISPLAY_VERSION,latest)>=0){
+        sessionStorage.removeItem('class-lunch-auto-update-target');
+        return;
+      }
+
+      const key='class-lunch-auto-update-target';
+      if(sessionStorage.getItem(key)===latest)return;
+      sessionStorage.setItem(key,latest);
+
+      if('caches' in window){
+        const keys=await caches.keys();
+        await Promise.all(keys.filter(k=>k.startsWith('class-lunch-static-')).map(k=>caches.delete(k)));
+      }
+      if('serviceWorker' in navigator){
+        const regs=await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.filter(r=>r.scope.includes('/class-lunch/')).map(r=>r.update().catch(()=>null)));
+      }
+
+      const u=new URL(location.href);
+      u.searchParams.set('_auto_update',latest+'-'+Date.now());
+      location.replace(u.href);
+    }catch(error){
+      console.warn('class_lunch_auto_version_check_failed',error);
+    }
+  }
   async function forceClassLunchUpdate(triggerButton=null){
     if(triggerButton?.disabled)return;
     if(triggerButton){triggerButton.disabled=true;triggerButton.textContent="更新中…";}
@@ -73,4 +119,6 @@
   }
 
   registerPwa();
+  checkForAppUpdate();
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")checkForAppUpdate()});
 })();
