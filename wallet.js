@@ -449,6 +449,15 @@
 
   injectUi();
   observeOrderDialog();
-  db.auth.onAuthStateChange(()=>setTimeout(refreshVisibility,500));
-  setTimeout(refreshVisibility,700);
+
+  window.refreshWalletVisibility=refreshVisibility;
+  window.addEventListener('class-lunch-student-ready',()=>refreshVisibility());
+
+  db.auth.onAuthStateChange(()=>{
+    setTimeout(refreshVisibility,250);
+    setTimeout(refreshVisibility,900);
+  });
+
+  setTimeout(refreshVisibility,350);
+  setTimeout(refreshVisibility,1200);
 })();
