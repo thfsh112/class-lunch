@@ -15,6 +15,7 @@
 
     <div class="admin-tabs admin-subtabs" data-admin-subgroup="orders">
       <button class="tab active" type="button" data-tab="overview">訂單總覽</button>
+      <button class="tab" type="button" data-tab="unpaid">未付款</button>
       <button class="tab" type="button" data-tab="sessions">訂餐日期</button>
       <button class="tab" type="button" data-tab="changes">訂單異動</button>
       <button class="tab" type="button" data-tab="history">歷史訂單</button>
@@ -36,6 +37,17 @@
   </nav>
 
   <section id="tab-overview" class="tab-page"><div class="panel"><div class="section-head"><h2>訂單總覽</h2><select id="overviewSession"></select></div><div class="stats"><div class="stat"><small>已訂</small><b id="statOrders">0</b></div><div class="stat"><small>已付款</small><b id="statPaid">0</b></div><div class="stat"><small>未付款</small><b id="statUnpaidCount">0</b></div><div class="stat"><small>總金額</small><b id="statTotal">$0</b></div></div><div id="itemStats" class="item-stats"></div><div id="unpaidSummary" class="item-stats unpaid-summary"></div><div id="seatPayments"></div></div></section>
+
+  <section id="tab-unpaid" class="tab-page hidden">
+    <div class="panel">
+      <div class="section-head">
+        <div><h2>未付款</h2><p class="hint">統整所有日期尚未收齊的訂單；今天優先，再依明天、後天排列，過去未收款放在最後。</p></div>
+        <button id="refreshUnpaidBtn" class="small-btn" type="button">重新整理</button>
+      </div>
+      <div id="allUnpaidSummary" class="stats"></div>
+      <div id="allUnpaidList"><div class="loading">載入中…</div></div>
+    </div>
+  </section>
 
   <section id="tab-sessions" class="tab-page hidden">
     <div class="panel"><h2>新增訂餐日期</h2><form id="sessionForm" class="admin-form-grid"><label>菜單<select id="sessionTemplate" required></select></label><label>供餐日期<input id="sessionDate" type="date" required></label><label>截止時間<input id="sessionCutoff" type="datetime-local"><small class="hint">預設為供餐日當天 10:00，可自行調整。</small></label><label class="check-row"><input id="sessionActive" type="checkbox" checked> 開放</label><button class="primary" type="submit">新增日期</button></form></div>
