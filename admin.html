@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-Hant">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>訂飯管理</title><link rel="icon" type="image/png" sizes="180x180" href="icon-192.png?v=20261005-76"><link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?v=20261005-76"><meta name="theme-color" content="#f7e7c6"><link rel="manifest" href="manifest.webmanifest?v=20261005-76"><link rel="stylesheet" href="style.css?v=20261005-76"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>訂飯管理</title><link rel="icon" type="image/png" sizes="180x180" href="icon-192.png?v=20261005-77"><link rel="apple-touch-icon" sizes="180x180" href="icon-192.png?v=20261005-77"><meta name="theme-color" content="#f7e7c6"><link rel="manifest" href="manifest.webmanifest?v=20261005-77"><link rel="stylesheet" href="style.css?v=20261005-77"></head>
 <body>
 <header class="top"><div><div class="eyebrow">ADMIN</div><h1>訂飯管理</h1><p id="loginStatus">請先在首頁登入 99 號，再進入管理頁。</p><p id="adminNightEgg" class="admin-night-egg hidden" aria-hidden="true"></p></div><a class="admin-link" href="index.html">回首頁</a></header>
 <main>
@@ -10,7 +10,7 @@
     <div class="admin-tabs admin-primary-tabs">
       <button class="tab active" type="button" data-admin-group="orders">訂餐系列</button>
       <button class="tab" type="button" data-admin-group="management">管理系列</button>
-      <button class="tab ghost" id="logoutBtn" type="button">登出</button>
+      <button class="tab" type="button" data-admin-group="money">金流異動</button>
     </div>
 
     <div class="admin-tabs admin-subtabs" data-admin-subgroup="orders">
@@ -25,6 +25,13 @@
       <button class="tab" type="button" data-tab="templates">菜單庫</button>
       <button class="tab" type="button" data-tab="backups">備份</button>
       <button class="tab" type="button" data-tab="logs">操作紀錄</button>
+    </div>
+
+    <div class="admin-tabs admin-subtabs hidden" data-admin-subgroup="money">
+      <button class="tab" type="button" data-tab="wallet-balances">錢包餘額</button>
+      <button class="tab" type="button" data-tab="wallet-topups">加值申請</button>
+      <button class="tab" type="button" data-tab="wallet-settlements">結清帳號</button>
+      <button class="tab" type="button" data-tab="wallet-ledger">金錢流水</button>
     </div>
   </nav>
 
@@ -87,6 +94,34 @@
   <section id="tab-logs" class="tab-page hidden">
     <div class="panel"><div class="section-head"><h2>操作紀錄</h2><button id="refreshLogsBtn" class="small-btn">重新整理</button></div><div id="auditList"></div></div>
   </section>
+
+  <section id="tab-wallet-balances" class="tab-page hidden">
+    <div class="panel">
+      <div class="section-head"><div><h2>錢包餘額</h2><p class="hint">查看各帳號目前錢包餘額與狀態。</p></div><button id="walletBalancesRefreshBtn" class="small-btn" type="button">重新整理</button></div>
+      <div id="walletBalancesList"></div>
+    </div>
+  </section>
+
+  <section id="tab-wallet-topups" class="tab-page hidden">
+    <div class="panel">
+      <div class="section-head"><div><h2>加值申請</h2><p class="hint">確認實際收到的金額後才會正式入帳。</p></div><button id="walletTopupsRefreshBtn" class="small-btn" type="button">重新整理</button></div>
+      <div id="walletTopupsList"></div>
+    </div>
+  </section>
+
+  <section id="tab-wallet-settlements" class="tab-page hidden">
+    <div class="panel">
+      <div class="section-head"><div><h2>結清帳號</h2><p class="hint">餘額為負數的帳號不能結清。</p></div><button id="walletSettlementsRefreshBtn" class="small-btn" type="button">重新整理</button></div>
+      <div id="walletSettlementsList"></div>
+    </div>
+  </section>
+
+  <section id="tab-wallet-ledger" class="tab-page hidden">
+    <div class="panel">
+      <div class="section-head"><div><h2>金錢流水</h2><p class="hint">所有儲值、扣款、現場付款、退款、調整與結清紀錄都會保留。</p></div><button id="walletLedgerRefreshBtn" class="small-btn" type="button">重新整理</button></div>
+      <div id="walletLedgerList"></div>
+    </div>
+  </section>
 </div>
 </main>
 
@@ -140,12 +175,12 @@
   </form>
 </dialog>
 
-<button class="app-version" type="button" data-app-version title="點一下重新載入最新版">1.68</button>
+<button class="app-version" type="button" data-app-version title="點一下重新載入最新版">1.69</button>
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>window.APP_CONFIG={supabaseUrl:"https://roynzxilxumfzzuezelg.supabase.co",publishableKey:"sb_publishable_nvmHzVjH7bZ8F9cnJYzKCg_PSPlhCXU"};</script>
-<script src="pwa.js?v=20261005-76"></script>
-<script src="admin.js?v=20261005-76"></script>
-<script src="wallet-admin.js?v=20261005-76"></script>
+<script src="pwa.js?v=20261005-77"></script>
+<script src="admin.js?v=20261005-77"></script>
+<script src="wallet-admin.js?v=20261005-77"></script>
 </body></html>
