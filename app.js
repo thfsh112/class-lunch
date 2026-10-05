@@ -660,7 +660,7 @@ async function loadSessions(){
 
     const [{data:os,error:oe},{data:mi,error:me}]=await Promise.all([
       db.from('orders')
-        .select('id,meal_session_id,item_name,unit_price,note,paid,payment_method,created_at,menu_item_id')
+        .select('id,meal_session_id,item_name,unit_price,note,paid,payment_method,onsite_received,created_at,menu_item_id')
         .eq('student_id',student.id)
         .in('meal_session_id',sessionIds)
         .order('created_at',{ascending:false}),
@@ -709,8 +709,9 @@ function renderSessions(){
     const rows=orderItemsByOrder[o.id]||[];
     const knownMarket=rows.some(x=>x.is_market_price);
     const unresolvedMarket=rows.some(x=>x.is_market_price&&x.market_price_amount==null)||(!knownMarket&&String(o.item_name||'').includes('（時價）'));
-    state='<div class="order-status '+(o.paid?'paid':'pending')+'"><b>'+(o.paid?'✓ 已付款':'已訂餐 · 未付款')+'</b><div>'+esc(o.item_name)+' · '+money(o.unit_price)+(unresolvedMarket?' ＋ 時價':'')+'</div><small>'+esc(o.note||'無備註')+'</small><small class="easter-note">'+esc(paymentEaster(!!o.paid,o.unit_price))+'</small></div>';
-    if(!closed&&!o.paid)state+='<div class="order-actions"><button class="primary" onclick="openOrderEditor('+s.id+')">修改訂單</button><button class="small-btn danger" onclick="cancelOrder('+s.id+')">取消訂單</button></div>';
+    const hasOnsiteMoney=Number(o.onsite_received||0)!==0;
+    state='<div class="order-status '+(o.paid?'paid':'pending')+'"><b>'+(o.paid?'✓ 已付款':'已訂餐 · 未付款')+'</b><div>'+esc(o.item_name)+' · '+money(o.unit_price)+(unresolvedMarket?' ＋ 時價':'')+'</div><small>'+esc(o.note||'無備註')+'</small>'+(hasOnsiteMoney&&!o.paid?'<small>此訂單已有現場收款紀錄，請由管理員處理後續。</small>':'')+'<small class="easter-note">'+esc(paymentEaster(!!o.paid,o.unit_price))+'</small></div>';
+    if(!closed&&!o.paid&&!hasOnsiteMoney)state+='<div class="order-actions"><button class="primary" onclick="openOrderEditor('+s.id+')">修改訂單</button><button class="small-btn danger" onclick="cancelOrder('+s.id+')">取消訂單</button></div>';
     else if(!closed&&o.paid&&o.payment_method==='wallet')state+='<div class="order-actions"><button class="small-btn danger" onclick="cancelOrder('+s.id+')">取消訂單並退回錢包</button></div>';
   }else if(closed){
     state='<div class="closed-order">詠丞小弟弟告訴你：<br>便當不點，錢全花在她身上，<br>她說永遠，最後還不是散場。<br>愛情會跑，雞腿不會說謊，<br>與其餓著等她，不如先讓自己吃爽。<br>可惜這次訂餐已經收場，<br>下次早點來，別再對著空胃惆悵。</div>';
