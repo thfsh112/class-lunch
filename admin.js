@@ -50,15 +50,26 @@ $('testSeat99PushBtn')?.addEventListener('click',async()=>{
   const btn=$('testSeat99PushBtn');
   btn.disabled=true;
   btn.textContent='發送中…';
-  const{data,error}=await db.functions.invoke('class-lunch-push',{body:{action:'test_seat99'}});
-  btn.disabled=false;
-  btn.textContent='發送 99 測試通知';
-  if(error||data?.error){
-    const reason=data?.error||error?.message||'unknown_error';
-    return toast('測試通知失敗：'+reason);
+  try{
+    const{data:{session}}=await db.auth.getSession();
+    if(!session?.access_token){
+      toast('99 登入狀態已失效，請重新登入');
+      return;
+    }
+    const{data,error}=await db.functions.invoke('class-lunch-push',{
+      body:{action:'test_seat99'},
+      headers:{Authorization:'Bearer '+session.access_token}
+    });
+    if(error||data?.error){
+      const reason=data?.error||error?.message||'unknown_error';
+      return toast('測試通知失敗：'+reason);
+    }
+    if(data?.skipped)return toast('沒有可用的 99 推播裝置');
+    toast('已送出 '+Number(data?.sent||0)+' 則 99 測試通知');
+  }finally{
+    btn.disabled=false;
+    btn.textContent='發送 99 測試通知';
   }
-  if(data?.skipped)return toast('沒有可用的 99 推播裝置');
-  toast('已送出 '+Number(data?.sent||0)+' 則 99 測試通知');
 });
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>$(b.dataset.close).close()));
 
