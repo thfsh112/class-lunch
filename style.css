@@ -184,7 +184,7 @@
 
 
 /* Money flow subtabs: four equal columns */
-.admin-subtabs[data-admin-subgroup="money"]{
+.admin-subtabs[data-admin-subgroup="money"]:not(.hidden){
   display:grid!important;
   grid-template-columns:repeat(4,minmax(0,1fr))!important;
   gap:8px!important;
@@ -197,7 +197,7 @@
   white-space:nowrap;
 }
 @media(max-width:640px){
-  .admin-subtabs[data-admin-subgroup="money"]{
+  .admin-subtabs[data-admin-subgroup="money"]:not(.hidden){
     display:grid!important;
     grid-template-columns:repeat(4,minmax(0,1fr))!important;
     overflow:visible!important;
