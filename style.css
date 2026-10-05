@@ -266,3 +266,44 @@
     padding:16px;
   }
 }
+
+
+/* Student wallet: keep title + tab bar fixed, scroll page content only */
+#walletDialog{
+  display:block;
+  overflow:hidden;
+}
+#walletDialog .history-shell{
+  display:flex;
+  flex-direction:column;
+  max-height:min(88vh,760px);
+  overflow:hidden;
+  padding:20px;
+}
+#walletDialog .dialog-head{
+  position:static;
+  flex:0 0 auto;
+  background:#fff;
+  padding-bottom:10px;
+}
+#walletDialog .wallet-student-tabs{
+  position:static;
+  flex:0 0 auto;
+  margin:0 0 14px!important;
+  background:#fff;
+  z-index:2;
+}
+#walletDialog .wallet-tab-page{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding-right:2px;
+}
+@media(max-width:640px){
+  #walletDialog .history-shell{
+    max-height:88vh;
+    padding:16px;
+  }
+}
