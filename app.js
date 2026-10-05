@@ -63,6 +63,36 @@ $('updateNowBtn')?.addEventListener('click',()=>{
   location.replace(u.href);
 });
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
+const HOME_EASTER_LINES=[
+  '系統無法替你決定人生，但可以替你記便當。',
+  '午餐不是人生全部，但餓的時候差不多。',
+  '今天最大的決策：到底要吃什麼。',
+  '你的胃沒有投票權，但它很有意見。',
+  '請謹慎下單，便當會記得你的選擇。',
+  '人生很難，午餐先處理。'
+];
+function renderHomeEasterSubtitle(){
+  const el=$('lunchEasterSubtitle');
+  if(!el)return;
+  el.textContent=HOME_EASTER_LINES[Math.floor(Math.random()*HOME_EASTER_LINES.length)];
+}
+function paymentEaster(paid,amount){
+  const value=money(amount);
+  return paid?'錢包已成功瘦身 '+value:'便當宇宙仍記得這筆 '+value;
+}
+function loyaltyStreakBadges(rows){
+  const badges=new Map();
+  let i=0;
+  while(i<rows.length){
+    const shop=String(rows[i]?.menu_name||'').trim();
+    let j=i+1;
+    while(shop&&j<rows.length&&String(rows[j]?.menu_name||'').trim()===shop)j++;
+    const streak=j-i;
+    if(shop&&streak>=3)badges.set(i,streak);
+    i=j;
+  }
+  return badges;
+}
 function fmtDate(v){const d=new Date(v+'T00:00:00');return d.toLocaleDateString('zh-TW',{month:'numeric',day:'numeric',weekday:'short'})}
 function fmtCutoff(v){if(!v)return'';return new Date(v).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}
 const HISTORY_DB_NAME='class-lunch-history-v1';
@@ -137,18 +167,21 @@ function renderHistoryList(list){
   const total=rows.reduce((sum,o)=>sum+Number(o.unit_price||0),0);
   const paid=rows.filter(o=>o.paid).length;
   const hasMarket=rows.some(o=>o.unresolved_market);
+  const loyaltyBadges=loyaltyStreakBadges(rows);
   $('historyCount').textContent=rows.length;
   $('historyTotal').textContent=money(total)+(hasMarket?' ＋ 時價':'');
   $('historyPaid').textContent=paid;
   $('historyUnpaid').textContent=rows.length-paid;
-  $('historyList').innerHTML=rows.length?rows.map(o=>{
+  $('historyList').innerHTML=rows.length?rows.map((o,i)=>{
     const date=o.meal_date||o.order_date||'';
     const shop=o.menu_name||'歷史訂單';
+    const streak=loyaltyBadges.get(i);
     return '<article class="history-row">'+
       '<div class="history-date">'+esc(date?fmtDate(date):'—')+'</div>'+
-      '<div class="history-main"><div class="history-title"><b>'+esc(shop)+'</b><span class="'+(o.paid?'history-paid':'history-unpaid')+'">'+(o.paid?'已付款':'未付款')+'</span></div>'+
+      '<div class="history-main"><div class="history-title"><b>'+esc(shop)+'</b><span class="'+(o.paid?'history-paid':'history-unpaid')+'">'+(o.paid?'已付款':'未付款')+'</span>'+(streak?'<span class="loyalty-badge">忠誠顧客 ×'+streak+'</span>':'')+'</div>'+
       '<div class="history-items">'+esc(o.item_name||'未記錄品項')+'</div>'+
-      (o.note?'<small>備註：'+esc(o.note)+'</small>':'')+'</div>'+
+      (o.note?'<small>備註：'+esc(o.note)+'</small>':'')+
+      '<small class="easter-note">'+esc(paymentEaster(!!o.paid,o.unit_price))+'</small></div>'+
       '<strong class="history-price">'+money(o.unit_price)+(o.unresolved_market?' ＋ 時價':'')+'</strong>'+
     '</article>';
   }).join(''):'<div class="history-empty"><b>還沒有歷史訂單</b><span>完成第一次訂餐後會出現在這裡。</span></div>';
@@ -158,10 +191,13 @@ function countdown(s){
   if(!s.cutoff_at)return '未設定截止時間';
   const ms=new Date(s.cutoff_at).getTime()-Date.now();
   if(ms<=0)return '已截止';
-  const mins=Math.floor(ms/60000),days=Math.floor(mins/1440),hrs=Math.floor((mins%1440)/60),m=mins%60;
+  const mins=Math.max(1,Math.ceil(ms/60000)),days=Math.floor(mins/1440),hrs=Math.floor((mins%1440)/60),m=mins%60;
   if(days>0)return '剩餘 '+days+'天 '+hrs+'小時';
   if(hrs>0)return '剩餘 '+hrs+'小時 '+m+'分';
-  return '即將截止 · 剩餘 '+Math.max(1,m)+'分';
+  if(mins<=3)return '剩餘 '+mins+'分 · 詠丞小弟弟正在看著你';
+  if(mins<=10)return '剩餘 '+mins+'分 · 現在才來？';
+  if(mins<=30)return '剩餘 '+mins+'分 · 你還有機會';
+  return '即將截止 · 剩餘 '+mins+'分';
 }
 function validSeat(seat){return Number.isInteger(seat)&&((seat>=1&&seat<=35)||seat===99)}
 function internalEmail(seat){return 'seat'+String(Number(seat)).padStart(2,'0')+'@class-lunch.example'}
@@ -664,7 +700,7 @@ function renderSessionPicker(){
   sel.disabled=sessions.length===0;sel.onchange=renderSessions;
 }
 function renderSessions(){
-  if(!sessions.length){$('menus').innerHTML='<div class="loading">目前沒有開放中的訂餐。</div>';return}
+  if(!sessions.length){$('menus').innerHTML='<div class="loading lunch-empty-egg"><b>今天暫時沒有便當可以支配你的人生。</b><span>有開放訂餐時會出現在這裡。</span></div>';return}
   const selectedId=Number($('sessionPicker')?.value)||sessions[0].id;
   const s=sessions.find(x=>x.id===selectedId)||sessions[0],o=orders.find(x=>x.meal_session_id===s.id),closed=expired(s);
   const img=s.menu_templates?.image_url?'<div class="photo-button" data-image-url="'+esc(s.menu_templates.image_url)+'"><img class="menu-photo" src="'+esc(s.menu_templates.image_url)+'" alt="菜單"></div>':'<div class="menu-photo placeholder">🍱</div>';
@@ -673,7 +709,7 @@ function renderSessions(){
     const rows=orderItemsByOrder[o.id]||[];
     const knownMarket=rows.some(x=>x.is_market_price);
     const unresolvedMarket=rows.some(x=>x.is_market_price&&x.market_price_amount==null)||(!knownMarket&&String(o.item_name||'').includes('（時價）'));
-    state='<div class="order-status '+(o.paid?'paid':'pending')+'"><b>'+(o.paid?'✓ 已付款':'已訂餐 · 未付款')+'</b><div>'+esc(o.item_name)+' · '+money(o.unit_price)+(unresolvedMarket?' ＋ 時價':'')+'</div><small>'+esc(o.note||'無備註')+'</small></div>';
+    state='<div class="order-status '+(o.paid?'paid':'pending')+'"><b>'+(o.paid?'✓ 已付款':'已訂餐 · 未付款')+'</b><div>'+esc(o.item_name)+' · '+money(o.unit_price)+(unresolvedMarket?' ＋ 時價':'')+'</div><small>'+esc(o.note||'無備註')+'</small><small class="easter-note">'+esc(paymentEaster(!!o.paid,o.unit_price))+'</small></div>';
     if(!closed&&!o.paid)state+='<div class="order-actions"><button class="primary" onclick="openOrderEditor('+s.id+')">修改訂單</button><button class="small-btn danger" onclick="cancelOrder('+s.id+')">取消訂單</button></div>';
   }else if(closed){
     state='<div class="closed-order">此訂餐已截止</div>';
@@ -816,6 +852,7 @@ function stopStudentRealtime(){
 }
 setInterval(()=>{if(student&&sessions.length)renderSessions()},30000);
 db.auth.onAuthStateChange(()=>setTimeout(refresh,0));
+renderHomeEasterSubtitle();
 refreshInstallStatus();
 setTimeout(refreshInstallStatus,32000);
 watchNotificationPermission();
