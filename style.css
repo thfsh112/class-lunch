@@ -234,3 +234,35 @@
     font-size:12px;
   }
 }
+
+
+/* Student wallet dialog: fixed viewport height with internal vertical scrolling */
+#walletDialog{
+  width:min(92vw,560px);
+  max-height:min(88vh,760px);
+  overflow:hidden;
+}
+#walletDialog .history-shell{
+  max-height:min(88vh,760px);
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding:20px;
+}
+#walletDialog .dialog-head{
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:#fff;
+  padding-bottom:10px;
+}
+@media(max-width:640px){
+  #walletDialog{
+    width:min(94vw,560px);
+    max-height:88vh;
+  }
+  #walletDialog .history-shell{
+    max-height:88vh;
+    padding:16px;
+  }
+}
