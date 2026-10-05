@@ -10,7 +10,7 @@
     <div class="admin-tabs admin-primary-tabs">
       <button class="tab active" type="button" data-admin-group="orders">訂餐系列</button>
       <button class="tab" type="button" data-admin-group="management">管理系列</button>
-      <button class="tab" type="button" data-admin-group="money">金流異動</button>
+      <button class="tab badge-tab" type="button" data-admin-group="money">金流異動<span id="moneyPendingBadge" class="count-badge hidden">0</span></button>
     </div>
 
     <div class="admin-tabs admin-subtabs" data-admin-subgroup="orders">
@@ -30,7 +30,8 @@
 
     <div class="admin-tabs admin-subtabs hidden" data-admin-subgroup="money">
       <button class="tab" type="button" data-tab="wallet-balances">錢包餘額</button>
-      <button class="tab" type="button" data-tab="wallet-topups">加值申請</button>
+      <button class="tab" type="button" data-tab="wallet-debts">欠款金額</button>
+      <button class="tab badge-tab" type="button" data-tab="wallet-topups">加值申請<span id="topupPendingBadge" class="count-badge hidden">0</span></button>
       <button class="tab" type="button" data-tab="wallet-settlements">結清帳號</button>
       <button class="tab" type="button" data-tab="wallet-ledger">金錢流水</button>
     </div>
@@ -114,6 +115,17 @@
     <div class="panel">
       <div class="section-head"><div><h2>錢包餘額</h2><p class="hint">查看各帳號目前錢包餘額與狀態。</p></div><button id="walletBalancesRefreshBtn" class="small-btn" type="button">重新整理</button></div>
       <div id="walletBalancesList"></div>
+    </div>
+  </section>
+
+  <section id="tab-wallet-debts" class="tab-page hidden">
+    <div class="panel">
+      <div class="section-head">
+        <div><h2>欠款金額</h2><p class="hint">統整錢包負餘額，以及現場付款尚未收齊的訂單。</p></div>
+        <button id="walletDebtsRefreshBtn" class="small-btn" type="button">重新整理</button>
+      </div>
+      <div id="walletDebtSummary" class="stats"></div>
+      <div id="walletDebtsList"></div>
     </div>
   </section>
 
