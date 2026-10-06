@@ -123,15 +123,19 @@ async function enterSelectedAdminClass(){
   $('adminApp').classList.remove('hidden');
   $('loginStatus').textContent='已登入管理者';
 
+  const canManageClasses=currentAdminRole==='system_admin'&&selectedAdminClassCode==='99';
   const classesTab=$('classesTabBtn');
-  if(classesTab)classesTab.classList.remove('hidden');
+  if(classesTab)classesTab.classList.toggle('hidden',!canManageClasses);
   const switchBtn=$('switchAdminClassBtn');
-  if(switchBtn)switchBtn.classList.remove('hidden');
+  if(switchBtn)switchBtn.classList.toggle('hidden',currentAdminRole!=='system_admin');
   const classLabel=$('currentAdminClassLabel');
   if(classLabel)classLabel.textContent=selectedAdminClassCode?selectedAdminClassCode+'班':'目前班級';
 
   const managementTabs=document.querySelector('[data-admin-subgroup="management"]');
-  if(managementTabs)managementTabs.style.gridTemplateColumns='repeat(5,minmax(0,1fr))';
+  if(managementTabs)managementTabs.style.gridTemplateColumns=canManageClasses
+    ?'repeat(5,minmax(0,1fr))'
+    :'repeat(4,minmax(0,1fr))';
+  if(!canManageClasses&&!$('tab-classes')?.classList.contains('hidden'))await openAdminTab('students');
 
   $('sessionDate').value=today();
   if($('backupDate')&&!$('backupDate').value)$('backupDate').value=today();
@@ -258,8 +262,9 @@ async function refresh(){
   if(!ok){stopAdminRealtime();return}
   if(pickerNeeded){stopAdminRealtime();await showAdminClassPicker();return}
 
+  const canManageClasses=currentAdminRole==='system_admin'&&selectedAdminClassCode==='99';
   const classesTab=$('classesTabBtn');
-  if(classesTab)classesTab.classList.toggle('hidden',currentAdminRole!=='system_admin');
+  if(classesTab)classesTab.classList.toggle('hidden',!canManageClasses);
   const switchBtn=$('switchAdminClassBtn');
   if(switchBtn)switchBtn.classList.toggle('hidden',currentAdminRole!=='system_admin');
   const classLabel=$('currentAdminClassLabel');
@@ -267,10 +272,10 @@ async function refresh(){
     ?selectedAdminClassCode+'班'
     :'目前班級';
   const managementTabs=document.querySelector('[data-admin-subgroup="management"]');
-  if(managementTabs)managementTabs.style.gridTemplateColumns=currentAdminRole==='system_admin'
+  if(managementTabs)managementTabs.style.gridTemplateColumns=canManageClasses
     ?'repeat(5,minmax(0,1fr))'
     :'repeat(4,minmax(0,1fr))';
-  if(currentAdminRole!=='system_admin'&&!$('tab-classes')?.classList.contains('hidden'))await openAdminTab('students');
+  if(!canManageClasses&&!$('tab-classes')?.classList.contains('hidden'))await openAdminTab('students');
   startAdminRealtime();
   $('sessionDate').value=today();
   if($('backupDate')&&!$('backupDate').value)$('backupDate').value=today();
