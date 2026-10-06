@@ -756,8 +756,6 @@ function setMenuVariantField(i,key,el){
   if(key==='is_default'&&v.is_default){
     menuConfigVariants.forEach((other,idx)=>{if(idx!==Number(i))other.is_default=false});
     renderMenuConfigEditor();
-  }else if(key==='name'){
-    renderMenuConfigEditor();
   }
 }
 function removeMenuVariant(i){
@@ -855,9 +853,11 @@ $('menuConfigForm')?.addEventListener('submit',async e=>{
         if(rr.error)throw rr.error;
         keyToVariantId.set(v._key,Number(rr.data.id));
       }else{
+        const oldKey=v._key;
         const rr=await db.from('menu_item_variants').insert(patch).select('id').single();
         if(rr.error)throw rr.error;
         v.id=Number(rr.data.id);v._key='v-'+v.id;
+        keyToVariantId.set(oldKey,v.id);
         keyToVariantId.set(v._key,v.id);
       }
     }
@@ -1533,16 +1533,16 @@ async function openMarketPriceDialog(orderId,seat){
   editingMarketOrderId=orderId;
   $('marketPriceSeat').textContent=seat+'號訂單';
   const{data,error}=await db.from('order_items')
-    .select('id,quantity,unit_price,is_market_price,market_price_amount,menu_items(name)')
+    .select('id,quantity,unit_price,is_market_price,market_price_amount,item_name_snapshot,menu_items(name)')
     .eq('order_id',orderId)
     .order('id');
   if(error)return toast('讀取時價品項失敗：'+error.message);
   const rows=data||[];
   marketOrderItems=rows.filter(x=>x.is_market_price);
-  marketFixedTotal=rows.filter(x=>!x.is_market_price).reduce((s,x)=>s+Number(x.unit_price||0)*Number(x.quantity||1),0);
+  marketFixedTotal=rows.reduce((s,x)=>s+Number(x.unit_price||0)*Number(x.quantity||1),0);
   if(!marketOrderItems.length)return toast('這張訂單沒有時價品項');
   $('marketPriceRows').innerHTML=marketOrderItems.map(x=>
-    '<label class="market-price-row"><span><b>'+esc(x.menu_items?.name||'時價品項')+'</b><small>數量 '+Number(x.quantity||1)+'</small></span>'+
+    '<label class="market-price-row"><span><b>'+esc(x.item_name_snapshot||x.menu_items?.name||'時價品項')+'</b><small>數量 '+Number(x.quantity||1)+' · 固定加價 '+money(x.unit_price||0)+'</small></span>'+
     '<input type="number" min="0" max="10000" step="1" data-market-id="'+x.id+'" value="'+(x.market_price_amount==null?'':Number(x.market_price_amount))+'" placeholder="每份實際金額"></label>'
   ).join('');
   $('marketPriceRows').querySelectorAll('input').forEach(el=>el.addEventListener('input',updateMarketPricePreview));
