@@ -151,7 +151,7 @@ async function enterSelectedAdminClass(){
 
   const activeTab=document.querySelector('.tab[data-tab].active')?.dataset?.tab;
   if(activeTab){
-    if(['unpaid','history','logs','changes','backups','wallet-balances','wallet-debts','wallet-topups','wallet-settlements','wallet-ledger'].includes(activeTab)){
+    if(['unpaid','history','logs','changes','backups','classes','wallet-balances','wallet-debts','wallet-topups','wallet-settlements','wallet-ledger'].includes(activeTab)){
       document.querySelector('.tab[data-tab="'+activeTab+'"]')?.click();
     }
   }
