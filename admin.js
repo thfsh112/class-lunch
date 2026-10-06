@@ -316,7 +316,7 @@ async function callClassManager(body){
       admin_session_required:'管理驗證已失效，請重新輸入管理帳密',
       class_exists:'此班級已存在',
       invalid_class_code:'班級代碼不正確，或與學生座號／99 衝突',
-      invalid_student_count:'學生人數必須介於 1～99',
+      invalid_student_count:'學生人數必須介於 1～98；99 號保留給系統管理員',
       invalid_class_name:'班級名稱不正確',
       invalid_admin_gate_credentials:'班級管理頁帳號或密碼格式不正確',
       invalid_gate_username:'班級管理頁帳號格式不正確',
@@ -381,7 +381,7 @@ async function addSelectedClassSeat(seat){
 }
 async function removeSelectedClassSeat(seat){
   const n=Number(seat);
-  if(!Number.isInteger(n)||n<1||n>99)return toast('座號必須介於 1～99');
+  if(!Number.isInteger(n)||n<1||n>98)return toast('學生座號必須介於 1～98；99 號保留給系統管理員');
   const target=students.find(s=>s.role==='student'&&s.active&&Number(s.seat_number)===n);
   if(!target)return toast(n+'號目前沒有在使用');
   if(!confirm('確定移除 '+n+' 號？\n帳號會停用，但歷史訂單、錢包與金流會保留。'))return;
