@@ -865,12 +865,22 @@ function choicesForGroup(groupId){
   return menuOptionChoices.filter(x=>Number(x.group_id)===Number(groupId)&&x.active!==false)
     .sort((a,b)=>Number(a.sort_order)-Number(b.sort_order)||Number(a.id)-Number(b.id));
 }
+function applyConfiguredDefaults(sel){
+  if(!sel?.menu_item_id)return sel;
+  const ids=[];
+  for(const g of groupsForSelection(sel)){
+    const defaults=choicesForGroup(g.id).filter(x=>x.is_default).slice(0,Number(g.max_select||1));
+    ids.push(...defaults.map(x=>Number(x.id)));
+  }
+  sel.option_ids=[...new Set(ids)];
+  return sel;
+}
 function newConfiguredSelection(itemId=''){
   const id=Number(itemId)||null;
   if(!id)return {menu_item_id:null,variant_id:null,option_ids:[]};
   const variants=variantsForItem(id);
   const preferred=variants.find(x=>x.is_default)||variants[0]||null;
-  return {menu_item_id:id,variant_id:preferred?.id||null,option_ids:[]};
+  return applyConfiguredDefaults({menu_item_id:id,variant_id:preferred?.id||null,option_ids:[]});
 }
 function sanitizeConfiguredSelection(sel){
   if(!sel?.menu_item_id)return newConfiguredSelection();
@@ -1019,7 +1029,7 @@ function updateTestOrderVariant(i,value){
   const current=sanitizeConfiguredSelection(testSelections[i]);
   current.variant_id=value?Number(value):null;
   current.option_ids=[];
-  testSelections[i]=sanitizeConfiguredSelection(current);
+  testSelections[i]=sanitizeConfiguredSelection(applyConfiguredDefaults(current));
   renderTestOrderRows();
 }
 function updateTestOrderSingleOption(i,groupId,value){
