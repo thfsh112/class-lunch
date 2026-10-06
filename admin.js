@@ -30,10 +30,10 @@ async function isAdmin(){
   const{data:{session}}=await db.auth.getSession();
   if(!session?.user)return false;
   const{data:self,error}=await db.from('students')
-    .select('seat_number,active')
+    .select('seat_number,active,role,class_id')
     .eq('auth_user_id',session.user.id)
     .maybeSingle();
-  return !error&&!!self?.active&&Number(self.seat_number)===99;
+  return !error&&!!self?.active&&['system_admin','class_admin'].includes(String(self.role||''));
 }
 async function hasActiveAdminGate(){
   if(!adminGatePassed)return false;
@@ -50,13 +50,13 @@ $('loginForm').addEventListener('submit',async e=>{
   const username=$('adminUsername').value.trim(),password=$('password').value;
 
   const{data:{session}}=await legacyDb.auth.getSession();
-  if(!session)return toast('請先回首頁登入 99 號，再進管理頁');
+  if(!session)return toast('請先回首頁登入管理帳號，再進管理頁');
 
   const{data:self,error:selfError}=await legacyDb.from('students')
-    .select('seat_number,active')
+    .select('seat_number,active,role,class_id')
     .eq('auth_user_id',session.user.id)
     .maybeSingle();
-  if(selfError||!self||!self.active||self.seat_number!==99)return toast('管理頁只開放 99 號');
+  if(selfError||!self||!self.active||!['system_admin','class_admin'].includes(String(self.role||'')))return toast('此帳號沒有管理權限');
 
   const{data,error}=await db.functions.invoke('class-lunch-admin-login',{body:{username,password}});
   if(error||data?.error){
@@ -141,7 +141,7 @@ async function refresh(){
   const ok=adminIdentity&&gateActive;
   $('loginBox').classList.toggle('hidden',ok);
   $('adminApp').classList.toggle('hidden',!ok);
-  $('loginStatus').textContent=ok?'已登入管理者':adminIdentity?'99 號已登入，請輸入管理帳密。':'請先在首頁登入 99 號。';
+  $('loginStatus').textContent=ok?'已登入管理者':adminIdentity?'管理身分已登入，請輸入管理帳密。':'請先在首頁登入管理帳號。';
   if(!ok){stopAdminRealtime();return}
   startAdminRealtime();
   $('sessionDate').value=today();
@@ -152,7 +152,7 @@ async function refresh(){
 }
 async function loadTemplates(){const{data,error}=await db.from('menu_templates').select('*').order('created_at',{ascending:false});if(error)return toast(error.message);templates=data||[];$('templateCount').textContent=templates.length+' 份';renderTemplateList()}
 async function loadSessions(){const{data,error}=await db.from('meal_sessions').select('*,menu_templates(name,image_url)').order('meal_date',{ascending:false}).order('created_at',{ascending:false});if(error)return toast(error.message);sessions=data||[];renderSessionList();renderOverviewSelect();if(!$('tab-history')?.classList.contains('hidden'))loadHistoryOrders()}
-async function loadStudents(){const{data,error}=await db.from('students').select('id,auth_user_id,seat_number,name,active,must_setup,created_at').order('seat_number');if(error)return toast(error.message);students=data||[];$('studentCount').textContent=students.length+' 人';renderStudentList()}
+async function loadStudents(){const{data,error}=await db.from('students').select('id,auth_user_id,seat_number,name,active,must_setup,role,class_id,created_at').order('seat_number');if(error)return toast(error.message);students=data||[];$('studentCount').textContent=students.length+' 人';renderStudentList()}
 
 function renderTemplateSelect(){
   $('sessionTemplate').innerHTML=templates.filter(t=>t.active).map(t=>'<option value="'+t.id+'">'+esc(t.name)+'</option>').join('');
@@ -484,11 +484,12 @@ $('deleteSessionBtn').addEventListener('click',async()=>{
 function openStudentDialog(id){const s=students.find(x=>x.id===id);if(!s)return;editingStudentId=id;$('editStudentSeat').textContent=s.seat_number+'號';$('editStudentName').value=s.name||'';$('editStudentActive').checked=s.active;$('editStudentPassword').value='';$('studentDialog').showModal()}
 $('studentEditForm').addEventListener('submit',async e=>{
   e.preventDefault();const s=students.find(x=>x.id===editingStudentId);if(!s)return;
-  const name=$('editStudentName').value.trim(),active=$('editStudentActive').checked,pw=$('editStudentPassword').value;
-  const{data,error}=await db.functions.invoke('class-lunch-students',{body:{action:'update',student_id:s.id,name,active}});
-  if(error||data?.error)return toast('更新失敗：'+(data?.detail||data?.error||error.message));
+  const rawName=$('editStudentName').value.trim(),active=$('editStudentActive').checked,pw=$('editStudentPassword').value;
+  const name=s.role==='teacher'?'老師':rawName;
+  const{error}=await db.from('students').update({name,active,updated_at:new Date().toISOString()}).eq('id',s.id);
+  if(error)return toast('更新失敗：'+error.message);
   if(pw){
-    if(!(s.seat_number===99&&pw==='099')&&!(s.seat_number===0&&pw==='tch')&&pw.length<4)return toast('密碼至少 4 碼');
+    if(!(s.role==='system_admin'&&pw==='099')&&!(s.role==='teacher'&&pw==='tch')&&pw.length<4)return toast('密碼至少 4 碼');
     const r=await db.functions.invoke('class-lunch-students',{body:{action:'reset_password',student_id:s.id,password:pw}});
     if(r.error||r.data?.error)return toast('資料已更新，但密碼重設失敗');
   }
@@ -979,7 +980,7 @@ function scheduleAdminRealtimeRefresh(kind){
   },350);
 }
 function startAdminRealtime(){
-  if(realtimeChannel)return;
+  if(realtimeChannel||document.hidden||$('adminApp')?.classList.contains('hidden'))return;
   realtimeChannel=db.channel('class-lunch-admin-realtime')
     .on('postgres_changes',{event:'*',schema:'public',table:'orders'},()=>scheduleAdminRealtimeRefresh('orders'))
     .on('postgres_changes',{event:'*',schema:'public',table:'order_items'},()=>scheduleAdminRealtimeRefresh('orders'))
@@ -992,4 +993,12 @@ function stopAdminRealtime(){
   clearTimeout(realtimeTimer);
   if(realtimeChannel){db.removeChannel(realtimeChannel);realtimeChannel=null}
 }
-db.auth.onAuthStateChange(()=>setTimeout(refresh,0));renderAdminNightEgg();setInterval(renderAdminNightEgg,60000);refresh();
+db.auth.onAuthStateChange(()=>setTimeout(refresh,0));
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){stopAdminRealtime();return}
+  if(!$('adminApp')?.classList.contains('hidden')){
+    startAdminRealtime();
+    Promise.all([loadSessions(),loadStudents()]).catch(()=>{});
+  }
+});
+renderAdminNightEgg();setInterval(renderAdminNightEgg,60000);refresh();
