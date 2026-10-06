@@ -916,7 +916,18 @@ document.addEventListener('visibilitychange',()=>{
 });
 $('historyDialog')?.addEventListener('close',()=>startStudentRealtime());
 $('accountDialog')?.addEventListener('close',()=>startStudentRealtime());
-if($('classLogin'))$('classLogin').value=localStorage.getItem('class-lunch-last-class')||'112';
+if($('classLogin')){
+  $('classLogin').placeholder='';
+  $('classLogin').value=localStorage.getItem('class-lunch-last-class')||'112';
+}
+$('seatLogin')?.addEventListener('input',()=>{
+  const account=String($('seatLogin').value||'').trim().toLowerCase();
+  if(account==='99'){
+    $('classLogin').value='';
+    return;
+  }
+  if(!$('classLogin').value)$('classLogin').value=localStorage.getItem('class-lunch-last-class')||'112';
+});
 renderHomeEasterSubtitle();
 refreshInstallStatus();
 setTimeout(refreshInstallStatus,32000);
