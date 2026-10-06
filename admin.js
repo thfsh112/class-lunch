@@ -61,7 +61,8 @@ $('loginForm').addEventListener('submit',async e=>{
   if(selfError||!self||!self.active||!['system_admin','class_admin'].includes(String(self.role||'')))return toast('此帳號沒有管理權限');
   currentAdminRole=String(self.role||'');
 
-  const{data,error}=await db.functions.invoke('class-lunch-admin-login',{body:{username,password}});
+  const classCode=String(localStorage.getItem('class-lunch-last-class')||'').trim();
+  const{data,error}=await db.functions.invoke('class-lunch-admin-login',{body:{username,password,class_code:classCode}});
   if(error||data?.error){
     adminGatePassed=false;
     return toast('管理帳號或密碼錯誤');
