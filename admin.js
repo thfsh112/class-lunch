@@ -12,7 +12,7 @@ function applyDefaultSessionCutoff(force=false){
   if(!date||!cutoff)return;
   if(force||!cutoff.value)cutoff.value=defaultCutoffForDate(date);
 }
-let templates=[],sessions=[],students=[],classes=[],editingTemplateId=null,editingSessionId=null,editingSessionOriginalDate='',editingStudentId=null,editingClassId=null,menuEditorItems=[],originalMenuItemIds=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null,currentAdminRole='',selectedAdminClassId='',selectedAdminClassCode='',selectedAdminClassName='',selectedAdminStudentCapacity=0;
+let templates=[],sessions=[],students=[],classes=[],editingTemplateId=null,editingSessionId=null,editingSessionOriginalDate='',editingStudentId=null,editingClassId=null,menuEditorItems=[],originalMenuItemIds=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null,currentAdminRole='',selectedAdminClassId='',selectedAdminClassCode='',selectedAdminClassName='',selectedAdminStudentCapacity=0,lastAdminRefreshStartedAt=0;
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
 function adminPaymentEaster(paid,amount){
   const value=money(amount);
@@ -244,6 +244,7 @@ function scopeAdminClass(query){
   return selectedAdminClassId?query.eq('class_id',selectedAdminClassId):query;
 }
 async function refresh(){
+  lastAdminRefreshStartedAt=Date.now();
   const adminIdentity=await isAdmin();
   const gateActive=adminIdentity?await hasActiveAdminGate():false;
   const ok=adminIdentity&&gateActive;
@@ -1494,7 +1495,7 @@ function stopAdminRealtime(){
   clearTimeout(realtimeTimer);
   if(realtimeChannel){db.removeChannel(realtimeChannel);realtimeChannel=null}
 }
-db.auth.onAuthStateChange(()=>setTimeout(refresh,0));
+db.auth.onAuthStateChange(()=>setTimeout(()=>{if(Date.now()-lastAdminRefreshStartedAt>1500)refresh()},150));
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){stopAdminRealtime();return}
   if(!$('adminApp')?.classList.contains('hidden')){
