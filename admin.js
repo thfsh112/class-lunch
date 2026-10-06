@@ -291,14 +291,16 @@ function renderClassList(){
   const el=$('classList');if(!el)return;
   $('classCount').textContent=classes.length+' 班';
   el.innerHTML=classes.map(c=>{
-    const admin=c.class_admin||{};
+    const admin=c.class_admin||null;
     const status=c.active?'啟用中':'已停用';
-    const adminState=admin.auth_bound?'班管已建立 Auth':'班管尚未首次登入';
+    const adminText=admin
+      ?' · 班管 '+esc(String(admin.seat_number))+' · '+(admin.auth_bound?'班管已建立 Auth':'班管尚未首次登入')
+      :' · 無班管';
     return '<div class="student-row">'+
       '<span class="seat-badge">'+esc(c.code)+'</span>'+
       '<div><b>'+esc(c.name||c.code+'班')+'</b><br>'+
       '<span class="hint">學生 '+Number(c.student_count||0)+' / 設定 '+Number(c.student_capacity||0)+' 人 · '+status+
-      ' · 班管 '+esc(String(admin.seat_number??c.code))+' · '+adminState+
+      adminText+
       ' · 管理頁 '+esc(c.admin_gate_username||'—')+'</span></div>'+
       '<div class="actions"><button class="small-btn" type="button" onclick="openClassDialog(\''+c.id+'\')">編輯</button></div>'+
     '</div>';
@@ -349,8 +351,16 @@ function openClassDialog(id){
   $('editClassGateUsername').value=c.admin_gate_username||'tnfsh'+c.code;
   $('editClassGatePassword').value='';
   $('editClassAdminPassword').value='';
-  const admin=c.class_admin||{};
-  $('editClassAccountInfo').textContent='班管主登入：'+c.code+' / '+String(admin.seat_number??c.code)+'；'+(admin.auth_bound?'Auth 已建立':'尚未首次登入');
+  const admin=c.class_admin||null;
+  const info=$('editClassAccountInfo');
+  const passwordField=$('editClassAdminPassword')?.closest('label');
+  const resetBtn=$('resetClassAdminPasswordBtn');
+  if(info){
+    info.classList.toggle('hidden',!admin);
+    info.textContent=admin?'班管主登入：'+c.code+' / '+String(admin.seat_number)+'；'+(admin.auth_bound?'Auth 已建立':'尚未首次登入'):'';
+  }
+  if(passwordField)passwordField.classList.toggle('hidden',!admin);
+  if(resetBtn)resetBtn.classList.toggle('hidden',!admin);
   $('classDialog').showModal();
 }
 $('classEditForm')?.addEventListener('submit',async e=>{
@@ -1142,11 +1152,11 @@ async function loadOrderChanges(){
   const box=$('orderChangeList');
   if(!box)return;
   box.innerHTML='<div class="loading">載入中…</div>';
-  const{data,error}=await db.from('class_lunch_audit_logs')
+  let q=db.from('class_lunch_audit_logs')
     .select('id,actor_user_id,actor_email,actor_type,action,entity_type,entity_id,detail,created_at')
-    .in('entity_type',['orders','order_items'])
-    .order('created_at',{ascending:false})
-    .limit(300);
+    .in('entity_type',['orders','order_items']);
+  q=scopeAdminClass(q);
+  const{data,error}=await q.order('created_at',{ascending:false}).limit(300);
   if(error){box.innerHTML='<div class="loading">讀取失敗</div>';return toast(error.message)}
   const rows=data||[];
   const menuIds=[...new Set(rows.flatMap(l=>[l.detail?.old?.menu_item_id,l.detail?.new?.menu_item_id]).filter(Boolean).map(Number))];
@@ -1170,9 +1180,10 @@ async function loadBackups(){
   const box=$('backupList');
   if(!box)return;
   box.innerHTML='<div class="loading">載入中…</div>';
-  const{data,error}=await db.from('class_lunch_backups')
-    .select('id,backup_type,meal_date,summary,created_by_email,created_at')
-    .order('created_at',{ascending:false});
+  let q=db.from('class_lunch_backups')
+    .select('id,backup_type,meal_date,summary,created_by_email,created_at');
+  q=scopeAdminClass(q);
+  const{data,error}=await q.order('created_at',{ascending:false});
   if(error){box.innerHTML='<div class="loading">讀取失敗</div>';return toast(error.message)}
   const rows=data||[];
   box.innerHTML=rows.length?rows.map(b=>{
@@ -1192,7 +1203,9 @@ $('createBackupBtn')?.addEventListener('click',async()=>{
   await loadBackups();
 });
 async function downloadBackup(id){
-  const{data,error}=await db.from('class_lunch_backups').select('id,backup_type,meal_date,summary,snapshot,created_at').eq('id',id).single();
+  let q=db.from('class_lunch_backups').select('id,backup_type,meal_date,summary,snapshot,created_at').eq('id',id);
+  q=scopeAdminClass(q);
+  const{data,error}=await q.single();
   if(error||!data)return toast('讀取備份失敗：'+(error?.message||'找不到資料'));
   const payload={backup_id:data.id,backup_type:data.backup_type,meal_date:data.meal_date,created_at:data.created_at,summary:data.summary,snapshot:data.snapshot};
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});
@@ -1220,7 +1233,9 @@ function logLabel(l){
 }
 async function loadLogs(){
   $('auditList').innerHTML='<div class="loading">載入中…</div>';
-  const{data,error}=await db.from('class_lunch_audit_logs').select('id,actor_user_id,actor_email,actor_type,action,entity_type,entity_id,detail,created_at').order('created_at',{ascending:false}).limit(100);
+  let q=db.from('class_lunch_audit_logs').select('id,actor_user_id,actor_email,actor_type,action,entity_type,entity_id,detail,created_at');
+  q=scopeAdminClass(q);
+  const{data,error}=await q.order('created_at',{ascending:false}).limit(100);
   if(error){$('auditList').innerHTML='<div class="loading">讀取失敗</div>';return toast(error.message)}
   const rows=data||[];
   $('auditList').innerHTML=rows.length?rows.map(l=>{
