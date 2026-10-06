@@ -537,6 +537,10 @@ async function openAccountDialog(){
 
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
+  // A frontend sign-in can replace the Supabase auth session_id. Admin sessions are
+  // bound to that id, so never carry an old admin gate/class selection across it.
+  localStorage.removeItem('class-lunch-admin-gate');
+  localStorage.removeItem('class-lunch-admin-class-selected');
   const classCode=String($('classLogin').value||'').trim();
   const account=String($('seatLogin').value||'').trim().toLowerCase();
   const raw=$('passwordLogin').value;
@@ -613,7 +617,7 @@ $('setupForm').addEventListener('submit',async e=>{
   $('setupForm').reset();toast('設定完成');await refresh();
 });
 
-$('logoutBtn').addEventListener('click',async()=>{localStorage.removeItem('class-lunch-admin-gate');await detachPushBeforeLogout();await db.auth.signOut({scope:'local'});student=null;studentViewClassId=null;loadedMenuTemplateKey='';refresh()});
+$('logoutBtn').addEventListener('click',async()=>{localStorage.removeItem('class-lunch-admin-gate');localStorage.removeItem('class-lunch-admin-class-selected');await detachPushBeforeLogout();await db.auth.signOut({scope:'local'});student=null;studentViewClassId=null;loadedMenuTemplateKey='';refresh()});
 $('accountBtn').addEventListener('click',openAccountDialog);
 $('notifyBtn').addEventListener('click',openAccountDialog);
 $('enablePushBtn').addEventListener('click',enablePushNotifications);
