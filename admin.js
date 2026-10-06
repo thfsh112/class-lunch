@@ -575,7 +575,11 @@ async function loadUnpaidOrders(){
   ]);
   if(unpaidRes.error){box.innerHTML='<div class="loading">讀取失敗</div>';return toast('讀取未付款名單失敗：'+unpaidRes.error.message)}
   if(refundRes.error){refundBox.innerHTML='<div class="loading">讀取失敗</div>';return toast('讀取待退款失敗：'+refundRes.error.message)}
-  const rows=unpaidRes.data||[],refunds=refundRes.data||[];
+  const rows=(unpaidRes.data||[]).slice().sort((a,b)=>
+    String(a.meal_date||'9999-12-31').localeCompare(String(b.meal_date||'9999-12-31'))||
+    Number(a.seat_number||99999)-Number(b.seat_number||99999)||
+    Number(a.order_id||0)-Number(b.order_id||0)
+  ),refunds=refundRes.data||[];
   const totalDue=rows.reduce((a,x)=>a+Number(x.amount_due||0),0);
   const totalRefund=refunds.reduce((a,x)=>a+Number(x.refund_due||0),0);
   summary.innerHTML=
