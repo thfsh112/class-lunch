@@ -109,16 +109,18 @@
 <dialog id="orderDialog" class="form-dialog">
   <form id="orderDialogForm">
     <div class="dialog-head"><div><small id="orderDialogDate"></small><h2 id="orderDialogTitle">訂餐</h2></div><button type="button" class="close-dialog" data-close="orderDialog">×</button></div>
-    <div id="freeOrderFields">
-      <label>品項<input id="orderItem" maxlength="100" placeholder="例如：豬肉丼飯"></label>
-      <label>金額<input id="orderAmount" type="number" min="0" max="10000" step="1" inputmode="numeric"></label>
+    <div id="orderDialogScroll" class="order-dialog-scroll">
+      <div id="freeOrderFields">
+        <label>品項<input id="orderItem" maxlength="100" placeholder="例如：豬肉丼飯"></label>
+        <label>金額<input id="orderAmount" type="number" min="0" max="10000" step="1" inputmode="numeric"></label>
+      </div>
+      <div id="testOrderFields" class="hidden">
+        <div class="item-editor-head"><b>選擇品項</b><span class="hint">選完會自動增加下一格</span></div>
+        <div id="testOrderRows"></div>
+        <div class="selected-price">合計：<b id="selectedItemPrice">$0</b></div>
+      </div>
+      <label>備註<input id="orderNote" maxlength="300" placeholder="選填"></label>
     </div>
-    <div id="testOrderFields" class="hidden">
-      <div class="item-editor-head"><b>選擇品項</b><span class="hint">選完會自動增加下一格</span></div>
-      <div id="testOrderRows"></div>
-      <div class="selected-price">合計：<b id="selectedItemPrice">$0</b></div>
-    </div>
-    <label>備註<input id="orderNote" maxlength="300" placeholder="選填"></label>
     <div class="dialog-actions"><button type="button" class="ghost" data-close="orderDialog">取消</button><button class="primary" type="submit">儲存訂單</button></div>
   </form>
 </dialog>
