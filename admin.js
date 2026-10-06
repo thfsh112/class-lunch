@@ -556,11 +556,66 @@ function renderStudentList(){
   }).join('')||'<div class="loading">尚無學生</div>';
 }
 $('templateForm').addEventListener('submit',async e=>{
-  e.preventDefault();const f=$('templateImage').files[0],name=$('templateName').value.trim();if(!f||!name)return;if(f.size>6*1024*1024)return toast('圖片請小於 6MB');
+  e.preventDefault();const f=$('templateImage').files[0],name=$('templateName').value.trim();if(!f||!name)return;if(f.size>12*1024*1024)return toast('圖片請小於 12MB');
   const url=await uploadMenuImage(f);if(!url)return;const{error}=await db.from('menu_templates').insert({name,image_url:url,active:true});if(error)return toast(error.message);
   e.target.reset();toast('菜單已存入');await loadTemplates();renderTemplateSelect();
 });
-async function uploadMenuImage(f){const ext=(f.name.split('.').pop()||'jpg').toLowerCase(),path='templates/'+crypto.randomUUID()+'.'+ext;const{error}=await db.storage.from('menu-images').upload(path,f,{contentType:f.type,upsert:false});if(error){toast('圖片上傳失敗：'+error.message);return null}return db.storage.from('menu-images').getPublicUrl(path).data.publicUrl}
+async function compressMenuImage(file){
+  if(!file||!String(file.type||'').startsWith('image/'))return {blob:file,ext:(file?.name?.split('.').pop()||'jpg').toLowerCase(),contentType:file?.type||'image/jpeg'};
+  if(file.type==='image/gif'||file.type==='image/svg+xml')return {blob:file,ext:(file.name.split('.').pop()||'jpg').toLowerCase(),contentType:file.type};
+
+  let source=null,revokeUrl='';
+  try{
+    if('createImageBitmap' in window){
+      source=await createImageBitmap(file);
+    }else{
+      const url=URL.createObjectURL(file);revokeUrl=url;
+      source=await new Promise((resolve,reject)=>{
+        const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=url;
+      });
+    }
+
+    const width=Number(source.width||source.naturalWidth||0),height=Number(source.height||source.naturalHeight||0);
+    if(!width||!height)return {blob:file,ext:(file.name.split('.').pop()||'jpg').toLowerCase(),contentType:file.type||'image/jpeg'};
+
+    const maxEdge=2000;
+    const scale=Math.min(1,maxEdge/Math.max(width,height));
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.round(width*scale));
+    canvas.height=Math.max(1,Math.round(height*scale));
+    const ctx=canvas.getContext('2d',{alpha:false});
+    if(!ctx)return {blob:file,ext:(file.name.split('.').pop()||'jpg').toLowerCase(),contentType:file.type||'image/jpeg'};
+    ctx.drawImage(source,0,0,canvas.width,canvas.height);
+
+    const makeBlob=(type,quality)=>new Promise(resolve=>canvas.toBlob(resolve,type,quality));
+    let blob=await makeBlob('image/webp',0.82);
+    let ext='webp',contentType='image/webp';
+    if(!blob){
+      blob=await makeBlob('image/jpeg',0.84);
+      ext='jpg';contentType='image/jpeg';
+    }
+    if(!blob)return {blob:file,ext:(file.name.split('.').pop()||'jpg').toLowerCase(),contentType:file.type||'image/jpeg'};
+
+    if(scale===1&&blob.size>=file.size){
+      return {blob:file,ext:(file.name.split('.').pop()||'jpg').toLowerCase(),contentType:file.type||'image/jpeg'};
+    }
+    return {blob,ext,contentType};
+  }finally{
+    try{source?.close?.()}catch{}
+    if(revokeUrl)URL.revokeObjectURL(revokeUrl);
+  }
+}
+async function uploadMenuImage(f){
+  const compressed=await compressMenuImage(f);
+  const path='templates/'+crypto.randomUUID()+'.'+compressed.ext;
+  const{error}=await db.storage.from('menu-images').upload(path,compressed.blob,{
+    contentType:compressed.contentType,
+    cacheControl:'31536000',
+    upsert:false
+  });
+  if(error){toast('圖片上傳失敗：'+error.message);return null}
+  return db.storage.from('menu-images').getPublicUrl(path).data.publicUrl;
+}
 async function openTemplateDialog(id){
   const t=templates.find(x=>x.id===id);if(!t)return;
   editingTemplateId=id;
@@ -763,7 +818,7 @@ $('templateEditForm').addEventListener('submit',async e=>{
   e.preventDefault();const t=templates.find(x=>x.id===editingTemplateId);if(!t)return;
   const name=$('editTemplateName').value.trim();if(!name)return toast('菜單名稱不能空白');
   const patch={name,active:$('editTemplateActive').checked,updated_at:new Date().toISOString()},f=$('editTemplateImage').files[0];
-  if(f){if(f.size>6*1024*1024)return toast('圖片請小於 6MB');const url=await uploadMenuImage(f);if(!url)return;patch.image_url=url}
+  if(f){if(f.size>12*1024*1024)return toast('圖片請小於 12MB');const url=await uploadMenuImage(f);if(!url)return;patch.image_url=url}
   const{error}=await db.from('menu_templates').update(patch).eq('id',editingTemplateId);if(error)return toast(error.message);
   const cleaned=menuEditorItems.map((x,i)=>({id:x.id||null,menu_template_id:editingTemplateId,category:String(x.category||'').trim(),name:String(x.name||'').trim(),price:x.is_market_price?0:Number(x.price||0),is_market_price:!!x.is_market_price,active:x.active!==false,sort_order:i})).filter(x=>x.name);
   if(cleaned.some(x=>!Number.isInteger(x.price)||x.price<0||x.price>10000))return toast('品項價格格式不正確');
