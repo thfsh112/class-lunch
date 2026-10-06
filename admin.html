@@ -227,6 +227,31 @@
   </form>
 </dialog>
 
+<dialog id="menuConfigDialog" class="form-dialog combo-config-dialog">
+  <form id="menuConfigForm">
+    <div class="dialog-head">
+      <div><small id="menuConfigItemName">品項</small><h2>組合／加購設定</h2></div>
+      <button type="button" class="close-dialog" data-close="menuConfigDialog">×</button>
+    </div>
+    <p class="hint">可設定單點／套餐／尺寸等「點餐方式」，再為指定方式加入必選或複選群組。加價會自動算進訂單與錢包。</p>
+
+    <section class="combo-admin-section">
+      <div class="item-editor-head"><div><b>點餐方式</b><span class="hint">沒有設定時，品項會直接用原價下單。</span></div><button id="addMenuVariantBtn" class="small-btn" type="button">＋新增方式</button></div>
+      <div id="menuVariantEditor"></div>
+    </section>
+
+    <section class="combo-admin-section">
+      <div class="item-editor-head"><div><b>選項群組</b><span class="hint">例如：配餐必選 1、飲料必選 1、加料最多 3。</span></div><button id="addMenuOptionGroupBtn" class="small-btn" type="button">＋新增群組</button></div>
+      <div id="menuOptionGroupEditor"></div>
+    </section>
+
+    <div class="dialog-actions">
+      <button type="button" class="ghost" data-close="menuConfigDialog">取消</button>
+      <button class="primary" type="submit">儲存組合設定</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="sessionDialog" class="form-dialog">
   <form id="sessionEditForm">
     <div class="dialog-head"><h2>編輯訂餐日期</h2><button type="button" class="close-dialog" data-close="sessionDialog">×</button></div>
