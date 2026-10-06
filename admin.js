@@ -299,6 +299,7 @@ async function loadStudents(){
   const{data,error}=await q.order('seat_number');
   if(error)return toast(error.message);
   students=data||[];renderStudentList();
+  if(!$('tab-classes')?.classList.contains('hidden'))renderClassRosterManagement();
 }
 async function callClassManager(body){
   const{data,error}=await db.functions.invoke('class-lunch-classes',{body});
@@ -340,50 +341,67 @@ function configureClassManagementPanels(){
   $('systemClassCreatePanel')?.classList.toggle('hidden',!globalTools);
   $('systemClassListPanel')?.classList.toggle('hidden',!globalTools);
 }
+function renderClassRosterManagement(){
+  const activeSeats=students
+    .filter(s=>s.role==='student'&&s.active)
+    .map(s=>Number(s.seat_number))
+    .filter(Number.isInteger)
+    .sort((a,b)=>a-b);
+  selectedAdminStudentCapacity=activeSeats.length;
+  const box=$('classRosterSeats');
+  if(box){
+    box.innerHTML=activeSeats.length
+      ?activeSeats.map(seat=>'<button class="small-btn" type="button" data-roster-seat="'+seat+'">'+seat+'號</button>').join('')
+      :'<span class="hint">目前沒有啟用中的學生座號</span>';
+    box.querySelectorAll('[data-roster-seat]').forEach(btn=>btn.addEventListener('click',()=>{
+      if($('classRosterSeat'))$('classRosterSeat').value=String(btn.dataset.rosterSeat||'');
+    }));
+  }
+  if($('classRosterHint'))$('classRosterHint').textContent=
+    selectedAdminClassCode+'班目前 '+activeSeats.length+' 位學生；座號：'+(activeSeats.join('、')||'無')+'。移除座號只會停用帳號，歷史訂單、錢包與金流保留。';
+}
 async function loadClassManagement(){
   configureClassManagementPanels();
   if(!selectedAdminClassId)return;
-  let meta=classes.find(x=>String(x.id)===selectedAdminClassId);
-  if(!meta?.student_capacity){
-    const{data,error}=await db.from('classes')
-      .select('id,code,name,active,student_capacity')
-      .eq('id',selectedAdminClassId).maybeSingle();
-    if(error||!data)return toast('班級資料讀取失敗');
-    meta=data;
-    const idx=classes.findIndex(x=>String(x.id)===selectedAdminClassId);
-    if(idx>=0)classes[idx]={...classes[idx],...data};else classes.push(data);
-  }
-  selectedAdminStudentCapacity=Number(meta.student_capacity||0);
-  if($('classRosterCount'))$('classRosterCount').value=String(selectedAdminStudentCapacity||1);
-  if($('classRosterHint'))$('classRosterHint').textContent=
-    selectedAdminClassCode+'班目前學生號碼 1～'+selectedAdminStudentCapacity+'；縮減人數只會停用超出的號碼，歷史訂單與金流會保留。';
+  if(!students.length)await loadStudents();
+  renderClassRosterManagement();
   if(currentAdminRole==='system_admin'&&selectedAdminClassCode==='99')await loadClasses();
 }
-async function resizeSelectedClass(count){
-  const next=Number(count);
-  if(!Number.isInteger(next)||next<1||next>99)return toast('學生人數必須介於 1～99');
-  const{data,error}=await db.rpc('class_lunch_admin_resize_class',{p_student_count:next});
-  if(error||data?.error)return toast('班級人數調整失敗：'+(error?.message||data?.error||'未知錯誤'));
-  selectedAdminStudentCapacity=Number(data.student_count||next);
-  if($('classRosterCount'))$('classRosterCount').value=String(selectedAdminStudentCapacity);
-  const meta=classes.find(x=>String(x.id)===selectedAdminClassId);
-  if(meta)meta.student_capacity=selectedAdminStudentCapacity;
+async function addSelectedClassSeat(seat){
+  const n=Number(seat);
+  if(!Number.isInteger(n)||n<1||n>99)return toast('座號必須介於 1～99');
+  const{data,error}=await db.rpc('class_lunch_admin_add_student_seat',{p_seat_number:n});
+  if(error||data?.error)return toast('新增座號失敗：'+(error?.message||data?.error||'未知錯誤'));
   await loadStudents();
+  renderClassRosterManagement();
   renderOverviewSelect();
-  toast('已調整為 '+selectedAdminStudentCapacity+' 位學生');
+  if($('classRosterSeat'))$('classRosterSeat').value='';
+  toast(n+'號已加入目前班級');
+}
+async function removeSelectedClassSeat(seat){
+  const n=Number(seat);
+  if(!Number.isInteger(n)||n<1||n>99)return toast('座號必須介於 1～99');
+  const target=students.find(s=>s.role==='student'&&s.active&&Number(s.seat_number)===n);
+  if(!target)return toast(n+'號目前沒有在使用');
+  if(!confirm('確定移除 '+n+' 號？\n帳號會停用，但歷史訂單、錢包與金流會保留。'))return;
+  const{data,error}=await db.rpc('class_lunch_admin_remove_student_seat',{p_seat_number:n});
+  if(error||data?.error)return toast('移除座號失敗：'+(error?.message||data?.error||'未知錯誤'));
+  await loadStudents();
+  renderClassRosterManagement();
+  renderOverviewSelect();
+  if($('classRosterSeat'))$('classRosterSeat').value='';
+  toast(n+'號已從目前班級移除');
 }
 $('classRosterForm')?.addEventListener('submit',async e=>{
   e.preventDefault();
-  const btn=e.submitter;if(btn){btn.disabled=true;btn.textContent='套用中…';}
-  try{await resizeSelectedClass(Number($('classRosterCount').value))}
-  finally{if(btn){btn.disabled=false;btn.textContent='套用人數';}}
+  const btn=e.submitter;if(btn){btn.disabled=true;btn.textContent='處理中…';}
+  try{await addSelectedClassSeat($('classRosterSeat').value)}
+  finally{if(btn){btn.disabled=false;btn.textContent='新增／恢復座號';}}
 });
-$('increaseClassRosterBtn')?.addEventListener('click',()=>resizeSelectedClass((selectedAdminStudentCapacity||Number($('classRosterCount')?.value)||1)+1));
-$('decreaseClassRosterBtn')?.addEventListener('click',()=>{
-  const current=selectedAdminStudentCapacity||Number($('classRosterCount')?.value)||1;
-  if(current<=1)return toast('至少保留 1 位學生');
-  if(!confirm('確定刪除最後一個學生號碼 '+current+' 號？\n歷史訂單與金流會保留，該帳號會停用。'))return;
-  resizeSelectedClass(current-1);
+$('removeClassRosterSeatBtn')?.addEventListener('click',async()=>{
+  const btn=$('removeClassRosterSeatBtn');btn.disabled=true;btn.textContent='處理中…';
+  try{await removeSelectedClassSeat($('classRosterSeat').value)}
+  finally{btn.disabled=false;btn.textContent='移除座號';}
 });
 
 async function loadClasses(){
