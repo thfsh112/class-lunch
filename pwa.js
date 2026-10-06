@@ -1,5 +1,5 @@
 (()=>{
-  const DISPLAY_VERSION="1.90";
+  const DISPLAY_VERSION="1.91";
   window.CLASS_LUNCH_APP_VERSION=DISPLAY_VERSION;
   function compareVersions(a,b){
     const aa=String(a||'').split('.').map(n=>Number(n)||0);
