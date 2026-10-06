@@ -170,21 +170,38 @@ async function loadSessions(){const{data,error}=await db.from('meal_sessions').s
 async function loadStudents(){const{data,error}=await db.from('students').select('id,auth_user_id,seat_number,name,active,must_setup,role,class_id,created_at').order('seat_number');if(error)return toast(error.message);students=data||[];renderStudentList()}
 async function callClassManager(body){
   const{data,error}=await db.functions.invoke('class-lunch-classes',{body});
-  if(error||data?.error){
-    const code=data?.error||'class_management_failed';
+  let payload=data||null;
+  if(!payload&&error?.context){
+    try{payload=await error.context.clone().json()}catch{}
+  }
+  if(error||payload?.error){
+    const code=String(payload?.error||'class_management_failed');
     const map={
+      unauthorized:'登入狀態已失效，請重新登入 99',
       system_admin_required:'只有 99 可以管理班級',
       admin_session_required:'管理驗證已失效，請重新輸入管理帳密',
       class_exists:'此班級已存在',
-      invalid_class_code:'班級代碼不正確，或與學生座號/99 衝突',
+      invalid_class_code:'班級代碼不正確，或與學生座號／99 衝突',
       invalid_student_count:'學生人數必須介於 1～99',
       invalid_class_name:'班級名稱不正確',
-      invalid_admin_gate_credentials:'班級管理頁帳密不正確',
-      class_not_found:'找不到班級'
+      invalid_admin_gate_credentials:'班級管理頁帳號或密碼格式不正確',
+      invalid_gate_username:'班級管理頁帳號格式不正確',
+      invalid_gate_password:'班級管理頁密碼至少需要 4 碼',
+      invalid_password:'班級管理員主登入密碼至少需要 4 碼',
+      class_not_found:'找不到這個班級',
+      class_admin_not_found:'找不到這個班級的管理員帳號',
+      class_create_failed:'班級建立失敗，請檢查班級代碼與學生人數後再試',
+      class_update_failed:'班級設定儲存失敗，請重新整理後再試',
+      password_reset_failed:'班級管理員密碼重設失敗，請稍後再試',
+      admin_account_create_failed:'班級管理員帳號建立失敗，請稍後再試',
+      admin_account_bind_failed:'班級管理員帳號綁定失敗，請稍後再試',
+      list_users_failed:'帳號資料讀取失敗，請稍後再試',
+      server_config_error:'伺服器設定異常，請稍後再試',
+      class_management_failed:'班級管理暫時無法使用，請重新整理後再試'
     };
-    throw new Error(map[code]||data?.detail||error?.message||code);
+    throw new Error(map[code]||'班級管理操作失敗，請重新整理後再試');
   }
-  return data;
+  return payload;
 }
 async function loadClasses(){
   if(currentAdminRole!=='system_admin')return;
