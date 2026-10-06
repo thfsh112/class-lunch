@@ -79,8 +79,12 @@ $('loginForm').addEventListener('submit',async e=>{
   $('password').value='';
   selectedAdminClassId=String(data?.class_id||'');
   selectedAdminClassCode=String(data?.class_code||'');
-  if(currentAdminRole==='system_admin')sessionStorage.removeItem('class-lunch-admin-class-selected');
-  await refresh();
+  if(currentAdminRole==='system_admin'){
+    sessionStorage.removeItem('class-lunch-admin-class-selected');
+    await showAdminClassPicker(true);
+  }else{
+    await refresh();
+  }
 });
 $('logoutBtn')?.addEventListener('click',async()=>{
   try{await db.functions.invoke('class-lunch-admin-login',{body:{action:'logout'}})}catch{}
@@ -91,36 +95,87 @@ $('logoutBtn')?.addEventListener('click',async()=>{
   refresh();
 });
 
-async function showAdminClassPicker(){
+function renderAdminClassPicker(){
+  const activeClasses=(classes||[]).filter(c=>c.active!==false);
+  const select=$('adminClassSelect');
+  if(!select)return;
+  select.innerHTML=activeClasses.map(c=>'<option value="'+esc(c.code)+'">'+esc(c.code+'｜'+(c.name||c.code+'班'))+'</option>').join('');
+  if(activeClasses.some(c=>String(c.code)==='99'))select.value='99';
+  else if(activeClasses.length)select.value=String(activeClasses[0].code);
+}
+async function showAdminClassPicker(forceReload=false){
   if(currentAdminRole!=='system_admin')return;
+  stopAdminRealtime();
   $('loginBox').classList.add('hidden');
   $('adminApp').classList.add('hidden');
   $('adminClassPickerBox').classList.remove('hidden');
   $('loginStatus').textContent='請選擇管理班級';
-  const data=await callClassManager({action:'list'}).catch(error=>{toast(error.message);return null});
-  if(!data)return;
-  classes=(data.classes||[]).filter(c=>c.active!==false);
-  const select=$('adminClassSelect');
-  select.innerHTML=classes.map(c=>'<option value="'+esc(c.code)+'">'+esc(c.code+'｜'+(c.name||c.code+'班'))+'</option>').join('');
-  if(classes.some(c=>String(c.code)==='99'))select.value='99';
-  else if(classes.length)select.value=String(classes[0].code);
+  if(forceReload||!classes.length){
+    const data=await callClassManager({action:'list'}).catch(error=>{toast(error.message);return null});
+    if(!data)return;
+    classes=data.classes||[];
+  }
+  renderAdminClassPicker();
+}
+async function enterSelectedAdminClass(){
+  $('loginBox').classList.add('hidden');
+  $('adminClassPickerBox').classList.add('hidden');
+  $('adminApp').classList.remove('hidden');
+  $('loginStatus').textContent='已登入管理者';
+
+  const classesTab=$('classesTabBtn');
+  if(classesTab)classesTab.classList.remove('hidden');
+  const switchBtn=$('switchAdminClassBtn');
+  if(switchBtn)switchBtn.classList.remove('hidden');
+  const classLabel=$('currentAdminClassLabel');
+  if(classLabel)classLabel.textContent=selectedAdminClassCode?selectedAdminClassCode+'班':'目前班級';
+
+  const managementTabs=document.querySelector('[data-admin-subgroup="management"]');
+  if(managementTabs)managementTabs.style.gridTemplateColumns='repeat(5,minmax(0,1fr))';
+
+  $('sessionDate').value=today();
+  if($('backupDate')&&!$('backupDate').value)$('backupDate').value=today();
+  applyDefaultSessionCutoff(true);
+
+  const jobs=[loadSessions(),loadStudents()];
+  if(!templates.length)jobs.push(loadTemplates());
+  await Promise.all(jobs);
+
+  renderTemplateSelect();
+  renderSessionList();
+  renderStudentList();
+  renderOverviewSelect();
+
+  startAdminRealtime();
+
+  const activeTab=document.querySelector('.tab[data-tab].active')?.dataset?.tab;
+  if(activeTab){
+    if(['unpaid','history','logs','changes','backups','wallet-balances','wallet-debts','wallet-topups','wallet-settlements','wallet-ledger'].includes(activeTab)){
+      document.querySelector('.tab[data-tab="'+activeTab+'"]')?.click();
+    }
+  }
 }
 $('adminClassPickerForm')?.addEventListener('submit',async e=>{
   e.preventDefault();
   const code=String($('adminClassSelect').value||'').trim();
   if(!code)return;
-  const{data,error}=await db.functions.invoke('class-lunch-admin-login',{body:{action:'select_class',class_code:code}});
-  if(error||data?.error)return toast('班級切換失敗，請重新整理後再試');
-  selectedAdminClassId=String(data.class_id||'');
-  selectedAdminClassCode=String(data.class_code||code);
-  selectedAdminClassName=String(data.class_name||'');
-  sessionStorage.setItem('class-lunch-admin-class-selected','1');
-  $('adminClassPickerBox').classList.add('hidden');
-  await refresh();
+  const btn=e.submitter;
+  if(btn){btn.disabled=true;btn.textContent='切換中…';}
+  try{
+    const{data,error}=await db.functions.invoke('class-lunch-admin-login',{body:{action:'select_class',class_code:code}});
+    if(error||data?.error)return toast('班級切換失敗，請重新整理後再試');
+    selectedAdminClassId=String(data.class_id||'');
+    selectedAdminClassCode=String(data.class_code||code);
+    selectedAdminClassName=String(data.class_name||'');
+    sessionStorage.setItem('class-lunch-admin-class-selected','1');
+    await enterSelectedAdminClass();
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='進入班級管理';}
+  }
 });
-$('switchAdminClassBtn')?.addEventListener('click',async()=>{
+$('switchAdminClassBtn')?.addEventListener('click',()=>{
   sessionStorage.removeItem('class-lunch-admin-class-selected');
-  await showAdminClassPicker();
+  showAdminClassPicker(false);
 });
 
 $('testSeat99PushBtn')?.addEventListener('click',async()=>{
@@ -224,9 +279,7 @@ async function refresh(){
   renderTemplateSelect();renderSessionList();renderStudentList();renderOverviewSelect();
 }
 async function loadTemplates(){
-  let q=db.from('menu_templates').select('*');
-  q=scopeAdminClass(q);
-  const{data,error}=await q.order('created_at',{ascending:false});
+  const{data,error}=await db.from('menu_templates').select('*').order('created_at',{ascending:false});
   if(error)return toast(error.message);
   templates=data||[];$('templateCount').textContent=templates.length+' 份';renderTemplateList();
 }
