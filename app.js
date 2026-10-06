@@ -737,7 +737,6 @@ function renderSessions(){
   if(!sessions.length){$('menus').innerHTML='<div class="loading lunch-empty-egg"><b>今天暫時沒有便當可以支配你的人生。</b><span>有開放訂餐時會出現在這裡。</span></div>';return}
   const selectedId=Number($('sessionPicker')?.value)||sessions[0].id;
   const s=sessions.find(x=>x.id===selectedId)||sessions[0],o=orders.find(x=>x.meal_session_id===s.id),closed=expired(s);
-  const manager=['system_admin','class_admin'].includes(String(student?.role||''));
   const img=s.menu_templates?.image_url?'<div class="photo-button" data-image-url="'+esc(s.menu_templates.image_url)+'"><img class="menu-photo" src="'+esc(s.menu_templates.image_url)+'" alt="菜單"></div>':'<div class="menu-photo placeholder">🍱</div>';
   let state='';
   if(o){
@@ -748,8 +747,6 @@ function renderSessions(){
     state='<div class="order-status '+(o.paid?'paid':'pending')+'"><b>'+(o.paid?'✓ 已付款':'已訂餐 · 未付款')+'</b><div>'+esc(o.item_name)+' · '+money(o.unit_price)+(unresolvedMarket?' ＋ 時價':'')+'</div><small>'+esc(o.note||'無備註')+'</small>'+(hasOnsiteMoney&&!o.paid?'<small>此訂單已有現場收款紀錄，請由管理員處理後續。</small>':'')+'<small class="easter-note">'+esc(paymentEaster(!!o.paid,o.unit_price))+'</small></div>';
     if(!closed&&!o.paid&&!hasOnsiteMoney)state+='<div class="order-actions"><button class="primary" onclick="openOrderEditor('+s.id+')">修改訂單</button><button class="small-btn danger" onclick="cancelOrder('+s.id+')">取消訂單</button></div>';
     else if(!closed&&o.paid&&o.payment_method==='wallet')state+='<div class="order-actions"><button class="small-btn danger" onclick="cancelOrder('+s.id+')">取消訂單並退回錢包</button></div>';
-  }else if(manager){
-    state='<div class="order-status empty"><b>管理帳號不參與點餐</b><span>請使用學生或老師帳號點餐。</span></div>';
   }else if(closed){
     state='<div class="closed-order">詠丞小弟弟告訴你：<br>便當不點，錢全花在她身上，<br>她說永遠，最後還不是散場。<br>愛情會跑，雞腿不會說謊，<br>與其餓著等她，不如先讓自己吃爽。<br>可惜這次訂餐已經收場，<br>下次早點來，別再對著空胃惆悵。</div>';
   }else{
@@ -788,7 +785,6 @@ function removeTestOrderSelection(i){
   renderTestOrderRows();
 }
 async function openOrderEditor(sessionId){
-  if(['system_admin','class_admin'].includes(String(student?.role||'')))return toast('管理帳號不能點餐');
   if(!(await ensureLatestVersionBeforeOrdering()))return;
   const s=sessions.find(x=>x.id===sessionId),o=orders.find(x=>x.meal_session_id===sessionId);
   if(!s||expired(s)||o?.paid)return;
