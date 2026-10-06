@@ -533,8 +533,7 @@ $('loginForm').addEventListener('submit',async e=>{
 
   if(seat===99){
     if(raw!=='099')return toast('座號或密碼錯誤');
-    const remembered=String(localStorage.getItem('class-lunch-last-class')||'').trim();
-    const contextClass=classCode||remembered||'112';
+    const contextClass=classCode||'99';
     const{data:initData,error:initError}=await db.functions.invoke('class-lunch-init-login',{body:{class_code:contextClass,seat_number:seat,initial_code:raw}});
     if(initError||initData?.error)return toast('99 登入失敗，請確認密碼或重新整理後再試');
     if(!initData?.access_token||!initData?.refresh_token)return toast('99 登入失敗');
