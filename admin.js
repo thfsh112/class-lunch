@@ -12,7 +12,7 @@ function applyDefaultSessionCutoff(force=false){
   if(!date||!cutoff)return;
   if(force||!cutoff.value)cutoff.value=defaultCutoffForDate(date);
 }
-let templates=[],sessions=[],students=[],classes=[],editingTemplateId=null,editingSessionId=null,editingSessionOriginalDate='',editingStudentId=null,editingClassId=null,menuEditorItems=[],originalMenuItemIds=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null,currentAdminRole='';
+let templates=[],sessions=[],students=[],classes=[],editingTemplateId=null,editingSessionId=null,editingSessionOriginalDate='',editingStudentId=null,editingClassId=null,menuEditorItems=[],originalMenuItemIds=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null,currentAdminRole='',selectedAdminClassId='',selectedAdminClassCode='',selectedAdminClassName='';
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
 function adminPaymentEaster(paid,amount){
   const value=money(amount);
@@ -43,9 +43,16 @@ async function hasActiveAdminGate(){
   const active=!error&&data?.ok&&data?.active===true;
   if(!active){
     adminGatePassed=false;
+    selectedAdminClassId='';
+    selectedAdminClassCode='';
+    selectedAdminClassName='';
     localStorage.removeItem('class-lunch-admin-gate');
+    sessionStorage.removeItem('class-lunch-admin-class-selected');
+    return false;
   }
-  return active;
+  selectedAdminClassId=String(data?.class_id||'');
+  selectedAdminClassCode=String(data?.class_code||'');
+  return true;
 }
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
@@ -61,8 +68,7 @@ $('loginForm').addEventListener('submit',async e=>{
   if(selfError||!self||!self.active||!['system_admin','class_admin'].includes(String(self.role||'')))return toast('此帳號沒有管理權限');
   currentAdminRole=String(self.role||'');
 
-  const classCode=String(localStorage.getItem('class-lunch-last-class')||'').trim();
-  const{data,error}=await db.functions.invoke('class-lunch-admin-login',{body:{username,password,class_code:classCode}});
+  const{data,error}=await db.functions.invoke('class-lunch-admin-login',{body:{username,password}});
   if(error||data?.error){
     adminGatePassed=false;
     return toast('管理帳號或密碼錯誤');
@@ -71,6 +77,9 @@ $('loginForm').addEventListener('submit',async e=>{
   adminGatePassed=true;
   localStorage.setItem('class-lunch-admin-gate','1');
   $('password').value='';
+  selectedAdminClassId=String(data?.class_id||'');
+  selectedAdminClassCode=String(data?.class_code||'');
+  if(currentAdminRole==='system_admin')sessionStorage.removeItem('class-lunch-admin-class-selected');
   await refresh();
 });
 $('logoutBtn')?.addEventListener('click',async()=>{
@@ -79,6 +88,38 @@ $('logoutBtn')?.addEventListener('click',async()=>{
   localStorage.removeItem('class-lunch-admin-gate');
   await db.auth.signOut({scope:'local'});
   refresh();
+});
+
+async function showAdminClassPicker(){
+  if(currentAdminRole!=='system_admin')return;
+  $('loginBox').classList.add('hidden');
+  $('adminApp').classList.add('hidden');
+  $('adminClassPickerBox').classList.remove('hidden');
+  $('loginStatus').textContent='請選擇管理班級';
+  const data=await callClassManager({action:'list'}).catch(error=>{toast(error.message);return null});
+  if(!data)return;
+  classes=(data.classes||[]).filter(c=>c.active!==false);
+  const select=$('adminClassSelect');
+  select.innerHTML=classes.map(c=>'<option value="'+esc(c.code)+'">'+esc(c.code+'｜'+(c.name||c.code+'班'))+'</option>').join('');
+  if(classes.some(c=>String(c.code)==='99'))select.value='99';
+  else if(classes.length)select.value=String(classes[0].code);
+}
+$('adminClassPickerForm')?.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const code=String($('adminClassSelect').value||'').trim();
+  if(!code)return;
+  const{data,error}=await db.functions.invoke('class-lunch-admin-login',{body:{action:'select_class',class_code:code}});
+  if(error||data?.error)return toast('班級切換失敗，請重新整理後再試');
+  selectedAdminClassId=String(data.class_id||'');
+  selectedAdminClassCode=String(data.class_code||code);
+  selectedAdminClassName=String(data.class_name||'');
+  sessionStorage.setItem('class-lunch-admin-class-selected','1');
+  $('adminClassPickerBox').classList.add('hidden');
+  await refresh();
+});
+$('switchAdminClassBtn')?.addEventListener('click',async()=>{
+  sessionStorage.removeItem('class-lunch-admin-class-selected');
+  await showAdminClassPicker();
 });
 
 $('testSeat99PushBtn')?.addEventListener('click',async()=>{
