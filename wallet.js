@@ -144,22 +144,15 @@
 
   function currentCheckoutQuote(){
     const structured=getTestItemsForSession().length>0;
-    if(structured){
-      const items=getTestItemsForSession();
-      const chosen=(typeof testSelections!=='undefined'?testSelections:[])
-        .filter(Boolean)
-        .map(id=>items.find(item=>String(item.id)===String(id)))
-        .filter(Boolean);
-      return {
-        amount:chosen.reduce((sum,item)=>sum+(item.is_market_price?0:Number(item.price||0)),0),
-        unresolvedMarket:chosen.some(item=>item.is_market_price)
-      };
+    if(structured&&typeof currentConfiguredQuote==='function'){
+      return currentConfiguredQuote();
     }
     const raw=String(byId('orderAmount')?.value??'').trim();
     const amount=Number(raw);
     return {
       amount:raw!==''&&Number.isFinite(amount)?amount:0,
-      unresolvedMarket:false
+      unresolvedMarket:false,
+      error:''
     };
   }
 
@@ -455,6 +448,7 @@
     const method=e.currentTarget.querySelector('input[name="walletPaymentMethod"]:checked')?.value||'onsite';
     if(method==='wallet'){
       const quote=currentCheckoutQuote();
+      if(quote.error)return toast(quote.error);
       if(quote.unresolvedMarket)return toast('時價尚未確定，不能使用錢包結帳');
       if(Number(quote.amount)<1)return toast('錢包結帳金額至少要 1 元');
     }
@@ -463,13 +457,8 @@
       const structured=getTestItemsForSession().length>0;
       let result;
       if(structured){
-        const counts=new Map();
-        for(const raw of testSelections.filter(Boolean)){
-          const id=Number(raw);counts.set(id,(counts.get(id)||0)+1);
-        }
-        if(!counts.size)throw new Error('至少選一個品項');
-        const items=[...counts.entries()].map(([menu_item_id,qty])=>({menu_item_id,qty}));
-        result=await db.rpc('place_class_lunch_order_v6',{
+        const items=buildStructuredOrderPayload(true);
+        result=await db.rpc('place_class_lunch_order_v7',{
           p_session_id:editingSessionId,p_items:items,p_note:note,p_payment_method:method
         });
       }else{
