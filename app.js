@@ -663,6 +663,8 @@ async function refresh(){
   if(!session){
     stopStudentRealtime();
     student=null;
+    studentViewClassId=null;
+    loadedMenuTemplateKey='';
     window.dispatchEvent(new Event('class-lunch-student-ready'));
     detachCurrentPushBinding();
     $('loginBox').classList.remove('hidden');$('setupBox').classList.add('hidden');$('studentApp').classList.add('hidden');
@@ -965,7 +967,7 @@ document.addEventListener('visibilitychange',()=>{
   if(document.hidden){stopStudentRealtime();return}
   if(student&&!$('studentApp')?.classList.contains('hidden')){
     startStudentRealtime();
-    loadSessions().catch(()=>{});
+    loadSessions({forceMenus:true}).catch(()=>{});
   }
 });
 $('historyDialog')?.addEventListener('close',()=>startStudentRealtime());
