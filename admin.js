@@ -12,7 +12,7 @@ function applyDefaultSessionCutoff(force=false){
   if(!date||!cutoff)return;
   if(force||!cutoff.value)cutoff.value=defaultCutoffForDate(date);
 }
-let templates=[],sessions=[],students=[],classes=[],editingTemplateId=null,editingSessionId=null,editingSessionOriginalDate='',editingStudentId=null,editingClassId=null,menuEditorItems=[],originalMenuItemIds=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null,currentAdminRole='',selectedAdminClassId='',selectedAdminClassCode='',selectedAdminClassName='';
+let templates=[],sessions=[],students=[],classes=[],editingTemplateId=null,editingSessionId=null,editingSessionOriginalDate='',editingStudentId=null,editingClassId=null,menuEditorItems=[],originalMenuItemIds=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null,currentAdminRole='',selectedAdminClassId='',selectedAdminClassCode='',selectedAdminClassName='',selectedAdminStudentCapacity=0;
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
 function adminPaymentEaster(paid,amount){
   const value=money(amount);
@@ -111,7 +111,7 @@ async function showAdminClassPicker(forceReload=false){
   $('adminClassPickerBox').classList.remove('hidden');
   $('loginStatus').textContent='請選擇管理班級';
   if(forceReload||!classes.length){
-    const{data,error}=await db.from('classes').select('id,code,name,active').eq('active',true).order('code');
+    const{data,error}=await db.from('classes').select('id,code,name,active,student_capacity').eq('active',true).order('code');
     if(error)return toast('班級清單讀取失敗');
     classes=data||[];
   }
@@ -123,19 +123,16 @@ async function enterSelectedAdminClass(){
   $('adminApp').classList.remove('hidden');
   $('loginStatus').textContent='已登入管理者';
 
-  const canManageClasses=currentAdminRole==='system_admin'&&selectedAdminClassCode==='99';
   const classesTab=$('classesTabBtn');
-  if(classesTab)classesTab.classList.toggle('hidden',!canManageClasses);
+  if(classesTab)classesTab.classList.remove('hidden');
   const switchBtn=$('switchAdminClassBtn');
   if(switchBtn)switchBtn.classList.toggle('hidden',currentAdminRole!=='system_admin');
   const classLabel=$('currentAdminClassLabel');
   if(classLabel)classLabel.textContent=selectedAdminClassCode?selectedAdminClassCode+'班':'目前班級';
 
   const managementTabs=document.querySelector('[data-admin-subgroup="management"]');
-  if(managementTabs)managementTabs.style.gridTemplateColumns=canManageClasses
-    ?'repeat(5,minmax(0,1fr))'
-    :'repeat(4,minmax(0,1fr))';
-  if(!canManageClasses&&!$('tab-classes')?.classList.contains('hidden'))await openAdminTab('students');
+  if(managementTabs)managementTabs.style.gridTemplateColumns='repeat(5,minmax(0,1fr))';
+  configureClassManagementPanels();
 
   $('sessionDate').value=today();
   if($('backupDate')&&!$('backupDate').value)$('backupDate').value=today();
@@ -171,6 +168,8 @@ $('adminClassPickerForm')?.addEventListener('submit',async e=>{
     selectedAdminClassId=String(data.class_id||'');
     selectedAdminClassCode=String(data.class_code||code);
     selectedAdminClassName=String(data.class_name||'');
+    const selectedMeta=classes.find(x=>String(x.code)===selectedAdminClassCode);
+    selectedAdminStudentCapacity=Number(selectedMeta?.student_capacity||0);
     sessionStorage.setItem('class-lunch-admin-class-selected','1');
     await enterSelectedAdminClass();
   }finally{
@@ -229,10 +228,7 @@ async function openAdminTab(tab){
   if(tab==='history')await loadHistoryOrders();
   if(tab==='backups')await loadBackups();
   if(tab==='unpaid')await loadUnpaidOrders();
-  if(tab==='classes'){
-    if(currentAdminRole!=='system_admin')return toast('只有 99 可以管理班級');
-    await loadClasses();
-  }
+  if(tab==='classes')await loadClassManagement();
 }
 
 document.querySelectorAll('.tab[data-tab]').forEach(b=>b.addEventListener('click',()=>openAdminTab(b.dataset.tab)));
@@ -262,9 +258,8 @@ async function refresh(){
   if(!ok){stopAdminRealtime();return}
   if(pickerNeeded){stopAdminRealtime();await showAdminClassPicker();return}
 
-  const canManageClasses=currentAdminRole==='system_admin'&&selectedAdminClassCode==='99';
   const classesTab=$('classesTabBtn');
-  if(classesTab)classesTab.classList.toggle('hidden',!canManageClasses);
+  if(classesTab)classesTab.classList.remove('hidden');
   const switchBtn=$('switchAdminClassBtn');
   if(switchBtn)switchBtn.classList.toggle('hidden',currentAdminRole!=='system_admin');
   const classLabel=$('currentAdminClassLabel');
@@ -272,10 +267,8 @@ async function refresh(){
     ?selectedAdminClassCode+'班'
     :'目前班級';
   const managementTabs=document.querySelector('[data-admin-subgroup="management"]');
-  if(managementTabs)managementTabs.style.gridTemplateColumns=canManageClasses
-    ?'repeat(5,minmax(0,1fr))'
-    :'repeat(4,minmax(0,1fr))';
-  if(!canManageClasses&&!$('tab-classes')?.classList.contains('hidden'))await openAdminTab('students');
+  if(managementTabs)managementTabs.style.gridTemplateColumns='repeat(5,minmax(0,1fr))';
+  configureClassManagementPanels();
   startAdminRealtime();
   $('sessionDate').value=today();
   if($('backupDate')&&!$('backupDate').value)$('backupDate').value=today();
@@ -298,7 +291,11 @@ async function loadSessions(){
 }
 async function loadStudents(){
   let q=db.from('students').select('id,auth_user_id,seat_number,name,active,must_setup,role,class_id,created_at');
-  q=scopeAdminClass(q);
+  if(selectedAdminClassCode==='99'&&currentAdminRole==='system_admin'){
+    q=q.or('class_id.eq.'+selectedAdminClassId+',role.eq.system_admin');
+  }else{
+    q=scopeAdminClass(q);
+  }
   const{data,error}=await q.order('seat_number');
   if(error)return toast(error.message);
   students=data||[];renderStudentList();
@@ -338,6 +335,57 @@ async function callClassManager(body){
   }
   return payload;
 }
+function configureClassManagementPanels(){
+  const globalTools=currentAdminRole==='system_admin'&&selectedAdminClassCode==='99';
+  $('systemClassCreatePanel')?.classList.toggle('hidden',!globalTools);
+  $('systemClassListPanel')?.classList.toggle('hidden',!globalTools);
+}
+async function loadClassManagement(){
+  configureClassManagementPanels();
+  if(!selectedAdminClassId)return;
+  let meta=classes.find(x=>String(x.id)===selectedAdminClassId);
+  if(!meta?.student_capacity){
+    const{data,error}=await db.from('classes')
+      .select('id,code,name,active,student_capacity')
+      .eq('id',selectedAdminClassId).maybeSingle();
+    if(error||!data)return toast('班級資料讀取失敗');
+    meta=data;
+    const idx=classes.findIndex(x=>String(x.id)===selectedAdminClassId);
+    if(idx>=0)classes[idx]={...classes[idx],...data};else classes.push(data);
+  }
+  selectedAdminStudentCapacity=Number(meta.student_capacity||0);
+  if($('classRosterCount'))$('classRosterCount').value=String(selectedAdminStudentCapacity||1);
+  if($('classRosterHint'))$('classRosterHint').textContent=
+    selectedAdminClassCode+'班目前學生號碼 1～'+selectedAdminStudentCapacity+'；縮減人數只會停用超出的號碼，歷史訂單與金流會保留。';
+  if(currentAdminRole==='system_admin'&&selectedAdminClassCode==='99')await loadClasses();
+}
+async function resizeSelectedClass(count){
+  const next=Number(count);
+  if(!Number.isInteger(next)||next<1||next>99)return toast('學生人數必須介於 1～99');
+  const{data,error}=await db.rpc('class_lunch_admin_resize_class',{p_student_count:next});
+  if(error||data?.error)return toast('班級人數調整失敗：'+(error?.message||data?.error||'未知錯誤'));
+  selectedAdminStudentCapacity=Number(data.student_count||next);
+  if($('classRosterCount'))$('classRosterCount').value=String(selectedAdminStudentCapacity);
+  const meta=classes.find(x=>String(x.id)===selectedAdminClassId);
+  if(meta)meta.student_capacity=selectedAdminStudentCapacity;
+  await loadStudents();
+  renderOverviewSelect();
+  toast('已調整為 '+selectedAdminStudentCapacity+' 位學生');
+}
+$('classRosterForm')?.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const btn=e.submitter;if(btn){btn.disabled=true;btn.textContent='套用中…';}
+  try{await resizeSelectedClass(Number($('classRosterCount').value))}
+  finally{if(btn){btn.disabled=false;btn.textContent='套用人數';}}
+});
+$('increaseClassRosterBtn')?.addEventListener('click',()=>resizeSelectedClass((selectedAdminStudentCapacity||Number($('classRosterCount')?.value)||1)+1));
+$('decreaseClassRosterBtn')?.addEventListener('click',()=>{
+  const current=selectedAdminStudentCapacity||Number($('classRosterCount')?.value)||1;
+  if(current<=1)return toast('至少保留 1 位學生');
+  if(!confirm('確定刪除最後一個學生號碼 '+current+' 號？\n歷史訂單與金流會保留，該帳號會停用。'))return;
+  resizeSelectedClass(current-1);
+});
+
 async function loadClasses(){
   if(currentAdminRole!=='system_admin')return;
   const data=await callClassManager({action:'list'}).catch(error=>{toast(error.message);return null});
@@ -478,11 +526,14 @@ function renderSessionList(){
   $('sessionList').innerHTML=current.map(s=>'<div class="admin-item">'+(s.menu_templates?.image_url?'<img src="'+esc(s.menu_templates.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(s.menu_templates?.name||'菜單')+'</b><br>'+esc(s.meal_date)+(s.cutoff_at?' · 截止 '+esc(new Date(s.cutoff_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):'')+'<br><span class="hint">'+(s.is_active?'開放':'關閉')+'</span></div><div class="actions"><button class="small-btn" onclick="openSessionDialog('+s.id+')">編輯</button></div></div>').join('')||'<div class="loading">今天起沒有訂餐日期</div>';
 }
 function renderStudentList(){
-  const visible=students.filter(s=>s.role!=='system_admin'&&(currentAdminRole==='system_admin'||s.role!=='class_admin'));
+  const visible=students.filter(s=>{
+    if(s.role==='system_admin')return selectedAdminClassCode==='99'&&currentAdminRole==='system_admin';
+    return currentAdminRole==='system_admin'||s.role!=='class_admin';
+  });
   $('studentCount').textContent=visible.length+' 人';
   $('studentList').innerHTML=visible.map(s=>{
     const canEdit=s.role!=='system_admin'&&(currentAdminRole==='system_admin'||s.role!=='class_admin');
-    const roleLabel=s.role==='teacher'?'老師':s.role==='class_admin'?'班級管理員':'學生';
+    const roleLabel=s.role==='teacher'?'老師':s.role==='class_admin'?'班級管理員':s.role==='system_admin'?'系統管理員':'學生';
     return '<div class="student-row"><span class="seat-badge">'+s.seat_number+'號</span><div><b>'+esc(s.name||'尚未設定姓名')+'</b><br><span class="hint">'+roleLabel+' · '+(s.auth_user_id?'帳號已建立':'尚未初始化')+' · '+(s.active?'啟用中':'已停用')+(s.must_setup?' · 待首次設定':'')+'</span></div><div class="actions">'+(canEdit?'<button class="small-btn" onclick="openStudentDialog(\''+s.id+'\')">編輯</button>':'')+'</div></div>';
   }).join('')||'<div class="loading">尚無學生</div>';
 }
@@ -1055,7 +1106,14 @@ async function loadOverview(){
     (noteRows.length?'<div class="order-notes-summary"><h3>備註</h3>'+noteRows.map(x=>'<div class="item-stat-row"><span><b>'+esc(x.seat+'號'+(x.name?' '+x.name:''))+'</b><br><small>'+esc(x.item)+'</small></span><strong>'+esc(x.note)+'</strong></div>').join('')+'</div>':'');
 
   const bySeat=new Map();for(const o of list){const st=students.find(s=>s.id===o.student_id),seat=st?.seat_number??Number(o.student_name);if(Number.isInteger(Number(seat)))bySeat.set(Number(seat),{...o,name:st?.name||''})}
-  const seats=[0,...Array.from({length:35},(_,i)=>i+1),99];
+  const rosterSeats=students
+    .filter(s=>s.active&&['teacher','student'].includes(String(s.role||'')))
+    .map(s=>Number(s.seat_number))
+    .filter(Number.isInteger);
+  const orderedExtraSeats=[...bySeat.keys()].filter(n=>!rosterSeats.includes(n));
+  const seats=[...new Set([...rosterSeats,...orderedExtraSeats])].sort((a,b)=>{
+    if(a===0)return -1;if(b===0)return 1;return a-b;
+  });
   $('seatPayments').innerHTML='<div class="seat-grid">'+seats.map(n=>{
     const o=bySeat.get(n),st=students.find(s=>s.seat_number===n),hasMarket=o&&marketByOrder.has(o.id),unresolved=o&&unresolvedOrders.has(o.id);
     const refundDue=o&&o.payment_method==='onsite'&&Number(o.onsite_balance_due||0)<0?Math.abs(Number(o.onsite_balance_due||0)):0;
