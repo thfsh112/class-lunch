@@ -5,7 +5,22 @@
 <header class="top"><div><div class="eyebrow">ADMIN</div><h1>訂飯管理</h1><p id="loginStatus">請先在首頁登入管理帳號，再進入管理頁。</p><p id="adminNightEgg" class="admin-night-egg hidden" aria-hidden="true"></p></div><a class="admin-link" href="index.html">回首頁</a></header>
 <main>
 <section id="loginBox" class="panel login-panel"><h2>管理者登入</h2><p class="hint">請先在首頁登入管理帳號，再輸入對應的管理帳密。</p><form id="loginForm"><label>帳號<input id="adminUsername" type="text" required autocomplete="username" placeholder="管理帳號"></label><label>密碼<input id="password" type="password" required autocomplete="current-password"></label><button class="primary" type="submit">進入管理</button></form></section>
+
+<section id="adminClassPickerBox" class="panel login-panel hidden">
+  <h2>選擇管理班級</h2>
+  <form id="adminClassPickerForm">
+    <label>班級<select id="adminClassSelect" required></select></label>
+    <button class="primary" type="submit">進入班級管理</button>
+  </form>
+</section>
+
 <div id="adminApp" class="hidden">
+  <div class="panel admin-class-context">
+    <div class="section-head">
+      <div><small>目前管理班級</small><h2 id="currentAdminClassLabel">—</h2></div>
+      <button id="switchAdminClassBtn" class="small-btn hidden" type="button">切換班級</button>
+    </div>
+  </div>
   <nav class="admin-nav" aria-label="管理功能">
     <div class="admin-tabs admin-primary-tabs">
       <button class="tab active" type="button" data-admin-group="orders">訂餐系列</button>
