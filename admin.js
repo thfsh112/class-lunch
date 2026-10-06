@@ -86,6 +86,7 @@ $('logoutBtn')?.addEventListener('click',async()=>{
   try{await db.functions.invoke('class-lunch-admin-login',{body:{action:'logout'}})}catch{}
   adminGatePassed=false;
   localStorage.removeItem('class-lunch-admin-gate');
+  sessionStorage.removeItem('class-lunch-admin-class-selected');
   await db.auth.signOut({scope:'local'});
   refresh();
 });
@@ -184,16 +185,32 @@ document.querySelectorAll('[data-admin-group]').forEach(b=>b.addEventListener('c
   await openAdminTab(group==='orders'?'overview':group==='management'?'students':'wallet-balances');
 }));
 
+function scopeAdminClass(query){
+  return selectedAdminClassId?query.eq('class_id',selectedAdminClassId):query;
+}
 async function refresh(){
   const adminIdentity=await isAdmin();
   const gateActive=adminIdentity?await hasActiveAdminGate():false;
   const ok=adminIdentity&&gateActive;
+  const pickerNeeded=ok&&currentAdminRole==='system_admin'&&sessionStorage.getItem('class-lunch-admin-class-selected')!=='1';
   $('loginBox').classList.toggle('hidden',ok);
-  $('adminApp').classList.toggle('hidden',!ok);
-  $('loginStatus').textContent=ok?'已登入管理者':adminIdentity?'管理身分已登入，請輸入管理帳密。':'請先在首頁登入管理帳號。';
+  $('adminClassPickerBox')?.classList.toggle('hidden',!pickerNeeded);
+  $('adminApp').classList.toggle('hidden',!ok||pickerNeeded);
+  $('loginStatus').textContent=!ok
+    ?(adminIdentity?'管理身分已登入，請輸入管理帳密。':'請先在首頁登入管理帳號。')
+    :pickerNeeded?'請選擇管理班級'
+    :'已登入管理者';
   if(!ok){stopAdminRealtime();return}
+  if(pickerNeeded){stopAdminRealtime();await showAdminClassPicker();return}
+
   const classesTab=$('classesTabBtn');
   if(classesTab)classesTab.classList.toggle('hidden',currentAdminRole!=='system_admin');
+  const switchBtn=$('switchAdminClassBtn');
+  if(switchBtn)switchBtn.classList.toggle('hidden',currentAdminRole!=='system_admin');
+  const classLabel=$('currentAdminClassLabel');
+  if(classLabel)classLabel.textContent=selectedAdminClassCode
+    ?selectedAdminClassCode+'班'
+    :'目前班級';
   const managementTabs=document.querySelector('[data-admin-subgroup="management"]');
   if(managementTabs)managementTabs.style.gridTemplateColumns=currentAdminRole==='system_admin'
     ?'repeat(5,minmax(0,1fr))'
@@ -206,9 +223,28 @@ async function refresh(){
   await Promise.all([loadTemplates(),loadSessions(),loadStudents()]);
   renderTemplateSelect();renderSessionList();renderStudentList();renderOverviewSelect();
 }
-async function loadTemplates(){const{data,error}=await db.from('menu_templates').select('*').order('created_at',{ascending:false});if(error)return toast(error.message);templates=data||[];$('templateCount').textContent=templates.length+' 份';renderTemplateList()}
-async function loadSessions(){const{data,error}=await db.from('meal_sessions').select('*,menu_templates(name,image_url)').order('meal_date',{ascending:false}).order('created_at',{ascending:false});if(error)return toast(error.message);sessions=data||[];renderSessionList();renderOverviewSelect();if(!$('tab-history')?.classList.contains('hidden'))loadHistoryOrders()}
-async function loadStudents(){const{data,error}=await db.from('students').select('id,auth_user_id,seat_number,name,active,must_setup,role,class_id,created_at').order('seat_number');if(error)return toast(error.message);students=data||[];renderStudentList()}
+async function loadTemplates(){
+  let q=db.from('menu_templates').select('*');
+  q=scopeAdminClass(q);
+  const{data,error}=await q.order('created_at',{ascending:false});
+  if(error)return toast(error.message);
+  templates=data||[];$('templateCount').textContent=templates.length+' 份';renderTemplateList();
+}
+async function loadSessions(){
+  let q=db.from('meal_sessions').select('*,menu_templates(name,image_url)');
+  q=scopeAdminClass(q);
+  const{data,error}=await q.order('meal_date',{ascending:false}).order('created_at',{ascending:false});
+  if(error)return toast(error.message);
+  sessions=data||[];renderSessionList();renderOverviewSelect();
+  if(!$('tab-history')?.classList.contains('hidden'))loadHistoryOrders();
+}
+async function loadStudents(){
+  let q=db.from('students').select('id,auth_user_id,seat_number,name,active,must_setup,role,class_id,created_at');
+  q=scopeAdminClass(q);
+  const{data,error}=await q.order('seat_number');
+  if(error)return toast(error.message);
+  students=data||[];renderStudentList();
+}
 async function callClassManager(body){
   const{data,error}=await db.functions.invoke('class-lunch-classes',{body});
   let payload=data||null;
