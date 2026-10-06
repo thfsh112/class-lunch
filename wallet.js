@@ -34,7 +34,7 @@
               <div class="stat"><small>目前餘額</small><b id="walletBalance">$0</b></div>
               <div class="stat"><small>狀態</small><b id="walletStatus">—</b></div>
             </div>
-            <div id="walletNegativeHint" class="hint hidden">目前餘額為負數，暫時不能使用錢包結帳；現場結帳仍可使用。</div>
+            <div id="walletNegativeHint" class="hint hidden">目前餘額必須至少有 1 元才能使用錢包結帳；現場結帳仍可使用。</div>
             <div class="wallet-payall-grid">
               <div class="wallet-payall-card">
                 <small>尚未付款</small>
@@ -155,7 +155,7 @@
     const onsiteRadio=box.querySelector('input[value="onsite"]');
     const quote=currentCheckoutQuote();
     const zeroAmount=Number(quote.amount)<1;
-    const walletStateBlocked=Number(w.balance)<0||w.status!=='active';
+    const walletStateBlocked=Number(w.balance)<=0||w.status!=='active';
     const blocked=walletStateBlocked||zeroAmount||quote.unresolvedMarket;
     walletRadio.disabled=blocked;
     if(blocked&&walletRadio.checked)onsiteRadio.checked=true;
@@ -224,7 +224,7 @@
       walletSnapshot=wRes.data;
       byId('walletBalance').textContent=money(walletSnapshot.balance);
       byId('walletStatus').textContent=walletSnapshot.status==='active'?'使用中':walletSnapshot.status==='settlement_pending'?'結清處理中':'已結清';
-      byId('walletNegativeHint').classList.toggle('hidden',Number(walletSnapshot.balance)>=0);
+      byId('walletNegativeHint').classList.toggle('hidden',Number(walletSnapshot.balance)>0);
 
       const unpaid=unpaidRes.data||{};
       byId('walletUnpaidTotal').textContent=money(Number(unpaid.unpaid_total||0));
