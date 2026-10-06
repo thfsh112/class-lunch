@@ -12,7 +12,7 @@ function applyDefaultSessionCutoff(force=false){
   if(!date||!cutoff)return;
   if(force||!cutoff.value)cutoff.value=defaultCutoffForDate(date);
 }
-let templates=[],sessions=[],students=[],editingTemplateId=null,editingSessionId=null,editingSessionOriginalDate='',editingStudentId=null,menuEditorItems=[],originalMenuItemIds=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null;
+let templates=[],sessions=[],students=[],editingTemplateId=null,editingSessionId=null,editingSessionOriginalDate='',editingStudentId=null,menuEditorItems=[],originalMenuItemIds=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null,currentAdminRole='';
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
 function adminPaymentEaster(paid,amount){
   const value=money(amount);
@@ -33,7 +33,9 @@ async function isAdmin(){
     .select('seat_number,active,role,class_id')
     .eq('auth_user_id',session.user.id)
     .maybeSingle();
-  return !error&&!!self?.active&&['system_admin','class_admin'].includes(String(self.role||''));
+  const ok=!error&&!!self?.active&&['system_admin','class_admin'].includes(String(self.role||''));
+  currentAdminRole=ok?String(self.role||''):'';
+  return ok;
 }
 async function hasActiveAdminGate(){
   if(!adminGatePassed)return false;
@@ -57,6 +59,7 @@ $('loginForm').addEventListener('submit',async e=>{
     .eq('auth_user_id',session.user.id)
     .maybeSingle();
   if(selfError||!self||!self.active||!['system_admin','class_admin'].includes(String(self.role||'')))return toast('此帳號沒有管理權限');
+  currentAdminRole=String(self.role||'');
 
   const{data,error}=await db.functions.invoke('class-lunch-admin-login',{body:{username,password}});
   if(error||data?.error){
@@ -152,7 +155,7 @@ async function refresh(){
 }
 async function loadTemplates(){const{data,error}=await db.from('menu_templates').select('*').order('created_at',{ascending:false});if(error)return toast(error.message);templates=data||[];$('templateCount').textContent=templates.length+' 份';renderTemplateList()}
 async function loadSessions(){const{data,error}=await db.from('meal_sessions').select('*,menu_templates(name,image_url)').order('meal_date',{ascending:false}).order('created_at',{ascending:false});if(error)return toast(error.message);sessions=data||[];renderSessionList();renderOverviewSelect();if(!$('tab-history')?.classList.contains('hidden'))loadHistoryOrders()}
-async function loadStudents(){const{data,error}=await db.from('students').select('id,auth_user_id,seat_number,name,active,must_setup,role,class_id,created_at').order('seat_number');if(error)return toast(error.message);students=data||[];$('studentCount').textContent=students.length+' 人';renderStudentList()}
+async function loadStudents(){const{data,error}=await db.from('students').select('id,auth_user_id,seat_number,name,active,must_setup,role,class_id,created_at').order('seat_number');if(error)return toast(error.message);students=data||[];renderStudentList()}
 
 function renderTemplateSelect(){
   $('sessionTemplate').innerHTML=templates.filter(t=>t.active).map(t=>'<option value="'+t.id+'">'+esc(t.name)+'</option>').join('');
@@ -164,7 +167,15 @@ function renderSessionList(){
   $('sessionCount').textContent=current.length+' 個';
   $('sessionList').innerHTML=current.map(s=>'<div class="admin-item">'+(s.menu_templates?.image_url?'<img src="'+esc(s.menu_templates.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(s.menu_templates?.name||'菜單')+'</b><br>'+esc(s.meal_date)+(s.cutoff_at?' · 截止 '+esc(new Date(s.cutoff_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):'')+'<br><span class="hint">'+(s.is_active?'開放':'關閉')+'</span></div><div class="actions"><button class="small-btn" onclick="openSessionDialog('+s.id+')">編輯</button></div></div>').join('')||'<div class="loading">今天起沒有訂餐日期</div>';
 }
-function renderStudentList(){$('studentList').innerHTML=students.map(s=>'<div class="student-row"><span class="seat-badge">'+s.seat_number+'號</span><div><b>'+esc(s.name||'尚未設定姓名')+'</b><br><span class="hint">'+(s.auth_user_id?'帳號已建立':'尚未初始化')+' · '+(s.active?'啟用中':'已停用')+(s.must_setup?' · 待首次設定':'')+'</span></div><div class="actions"><button class="small-btn" onclick="openStudentDialog(\''+s.id+'\')">編輯</button></div></div>').join('')||'<div class="loading">尚無學生</div>'}
+function renderStudentList(){
+  const visible=students.filter(s=>s.role!=='system_admin'&&(currentAdminRole==='system_admin'||s.role!=='class_admin'));
+  $('studentCount').textContent=visible.length+' 人';
+  $('studentList').innerHTML=visible.map(s=>{
+    const canEdit=s.role!=='system_admin'&&(currentAdminRole==='system_admin'||s.role!=='class_admin');
+    const roleLabel=s.role==='teacher'?'老師':s.role==='class_admin'?'班級管理員':'學生';
+    return '<div class="student-row"><span class="seat-badge">'+s.seat_number+'號</span><div><b>'+esc(s.name||'尚未設定姓名')+'</b><br><span class="hint">'+roleLabel+' · '+(s.auth_user_id?'帳號已建立':'尚未初始化')+' · '+(s.active?'啟用中':'已停用')+(s.must_setup?' · 待首次設定':'')+'</span></div><div class="actions">'+(canEdit?'<button class="small-btn" onclick="openStudentDialog(\''+s.id+'\')">編輯</button>':'')+'</div></div>';
+  }).join('')||'<div class="loading">尚無學生</div>';
+}
 $('templateForm').addEventListener('submit',async e=>{
   e.preventDefault();const f=$('templateImage').files[0],name=$('templateName').value.trim();if(!f||!name)return;if(f.size>6*1024*1024)return toast('圖片請小於 6MB');
   const url=await uploadMenuImage(f);if(!url)return;const{error}=await db.from('menu_templates').insert({name,image_url:url,active:true});if(error)return toast(error.message);
@@ -481,17 +492,22 @@ $('deleteSessionBtn').addEventListener('click',async()=>{
   $('sessionDialog').close();toast('空白訂餐日期已永久刪除');await loadSessions();
 });
 
-function openStudentDialog(id){const s=students.find(x=>x.id===id);if(!s)return;editingStudentId=id;$('editStudentSeat').textContent=s.seat_number+'號';$('editStudentName').value=s.name||'';$('editStudentActive').checked=s.active;$('editStudentPassword').value='';$('studentDialog').showModal()}
+function openStudentDialog(id){
+  const s=students.find(x=>x.id===id);if(!s)return;
+  const canEdit=s.role!=='system_admin'&&(currentAdminRole==='system_admin'||s.role!=='class_admin');
+  if(!canEdit)return toast('此管理帳號不能修改這個帳號');
+  editingStudentId=id;$('editStudentSeat').textContent=s.seat_number+'號';$('editStudentName').value=s.name||'';$('editStudentActive').checked=s.active;$('editStudentPassword').value='';$('studentDialog').showModal()
+}
 $('studentEditForm').addEventListener('submit',async e=>{
   e.preventDefault();const s=students.find(x=>x.id===editingStudentId);if(!s)return;
   const rawName=$('editStudentName').value.trim(),active=$('editStudentActive').checked,pw=$('editStudentPassword').value;
   const name=s.role==='teacher'?'老師':rawName;
-  const{error}=await db.from('students').update({name,active,updated_at:new Date().toISOString()}).eq('id',s.id);
-  if(error)return toast('更新失敗：'+error.message);
+  const u=await db.functions.invoke('class-lunch-students',{body:{action:'update',student_id:s.id,name,active}});
+  if(u.error||u.data?.error)return toast('更新失敗：'+(u.data?.detail||u.data?.error||u.error?.message||'未知錯誤'));
   if(pw){
-    if(!(s.role==='system_admin'&&pw==='099')&&!(s.role==='teacher'&&pw==='tch')&&pw.length<4)return toast('密碼至少 4 碼');
+    if(!(s.role==='teacher'&&pw==='tch')&&pw.length<4)return toast('密碼至少 4 碼');
     const r=await db.functions.invoke('class-lunch-students',{body:{action:'reset_password',student_id:s.id,password:pw}});
-    if(r.error||r.data?.error)return toast('資料已更新，但密碼重設失敗');
+    if(r.error||r.data?.error)return toast('資料已更新，但密碼重設失敗：'+(r.data?.detail||r.data?.error||r.error?.message||'未知錯誤'));
   }
   $('studentDialog').close();toast('學生資料已更新');await loadStudents();
 });
