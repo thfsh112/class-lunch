@@ -369,7 +369,7 @@ async function loadClassManagement(){
 }
 async function addSelectedClassSeat(seat){
   const n=Number(seat);
-  if(!Number.isInteger(n)||n<1||n>99)return toast('座號必須介於 1～99');
+  if(!Number.isInteger(n)||n<1||n>98)return toast('學生座號必須介於 1～98；99 號保留給系統管理員');
   const{data,error}=await db.rpc('class_lunch_admin_add_student_seat',{p_seat_number:n});
   if(error||data?.error)return toast('新增座號失敗：'+(error?.message||data?.error||'未知錯誤'));
   await loadStudents();
@@ -444,7 +444,7 @@ $('classCreateForm')?.addEventListener('submit',async e=>{
   const code=String($('classCode').value||'').trim();
   const studentCount=Number($('classStudentCount').value);
   if(!/^\d{2,4}$/.test(code))return toast('班級代碼請輸入 2～4 位數字');
-  if(!Number.isInteger(studentCount)||studentCount<1||studentCount>99)return toast('學生人數請輸入 1～99');
+  if(!Number.isInteger(studentCount)||studentCount<1||studentCount>98)return toast('學生人數請輸入 1～98；99 號保留給系統管理員');
   if(Number(code)===99||Number(code)<=studentCount)return toast('班級代碼不可與學生座號或 99 衝突');
   const btn=e.submitter; if(btn){btn.disabled=true;btn.textContent='建立中…';}
   try{
@@ -557,7 +557,9 @@ function renderStudentList(){
 }
 $('templateForm').addEventListener('submit',async e=>{
   e.preventDefault();const f=$('templateImage').files[0],name=$('templateName').value.trim();if(!f||!name)return;if(f.size>12*1024*1024)return toast('圖片請小於 12MB');
-  const url=await uploadMenuImage(f);if(!url)return;const{error}=await db.from('menu_templates').insert({name,image_url:url,active:true});if(error)return toast(error.message);
+  const url=await uploadMenuImage(f);if(!url)return;
+  const{error}=await db.from('menu_templates').insert({name,image_url:url,active:true});
+  if(error){await removeMenuImageUrl(url);return toast(error.message)}
   e.target.reset();toast('菜單已存入');await loadTemplates();renderTemplateSelect();
 });
 async function compressMenuImage(file){
@@ -615,6 +617,22 @@ async function uploadMenuImage(f){
   });
   if(error){toast('圖片上傳失敗：'+error.message);return null}
   return db.storage.from('menu-images').getPublicUrl(path).data.publicUrl;
+}
+function menuImageStoragePath(url){
+  if(!url)return '';
+  try{
+    const u=new URL(url);
+    const marker='/storage/v1/object/public/menu-images/';
+    const pos=u.pathname.indexOf(marker);
+    return pos>=0?decodeURIComponent(u.pathname.slice(pos+marker.length)):'';
+  }catch{return ''}
+}
+async function removeMenuImageUrl(url){
+  const storagePath=menuImageStoragePath(url);
+  if(!storagePath)return false;
+  const{error}=await db.storage.from('menu-images').remove([storagePath]);
+  if(error){console.warn('menu_image_cleanup_failed',error);return false}
+  return true;
 }
 async function openTemplateDialog(id){
   const t=templates.find(x=>x.id===id);if(!t)return;
@@ -818,8 +836,19 @@ $('templateEditForm').addEventListener('submit',async e=>{
   e.preventDefault();const t=templates.find(x=>x.id===editingTemplateId);if(!t)return;
   const name=$('editTemplateName').value.trim();if(!name)return toast('菜單名稱不能空白');
   const patch={name,active:$('editTemplateActive').checked,updated_at:new Date().toISOString()},f=$('editTemplateImage').files[0];
-  if(f){if(f.size>12*1024*1024)return toast('圖片請小於 12MB');const url=await uploadMenuImage(f);if(!url)return;patch.image_url=url}
-  const{error}=await db.from('menu_templates').update(patch).eq('id',editingTemplateId);if(error)return toast(error.message);
+  let uploadedImageUrl='';
+  if(f){
+    if(f.size>12*1024*1024)return toast('圖片請小於 12MB');
+    uploadedImageUrl=await uploadMenuImage(f);
+    if(!uploadedImageUrl)return;
+    patch.image_url=uploadedImageUrl;
+  }
+  const{error}=await db.from('menu_templates').update(patch).eq('id',editingTemplateId);
+  if(error){
+    if(uploadedImageUrl)await removeMenuImageUrl(uploadedImageUrl);
+    return toast(error.message);
+  }
+  if(uploadedImageUrl&&t.image_url&&t.image_url!==uploadedImageUrl)await removeMenuImageUrl(t.image_url);
   const cleaned=menuEditorItems.map((x,i)=>({id:x.id||null,menu_template_id:editingTemplateId,category:String(x.category||'').trim(),name:String(x.name||'').trim(),price:x.is_market_price?0:Number(x.price||0),is_market_price:!!x.is_market_price,active:x.active!==false,sort_order:i})).filter(x=>x.name);
   if(cleaned.some(x=>!Number.isInteger(x.price)||x.price<0||x.price>10000))return toast('品項價格格式不正確');
 
