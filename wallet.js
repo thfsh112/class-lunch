@@ -127,18 +127,52 @@
     return data;
   }
 
+  function currentCheckoutQuote(){
+    const structured=getTestItemsForSession().length>0;
+    if(structured){
+      const items=getTestItemsForSession();
+      const chosen=(typeof testSelections!=='undefined'?testSelections:[])
+        .filter(Boolean)
+        .map(id=>items.find(item=>String(item.id)===String(id)))
+        .filter(Boolean);
+      return {
+        amount:chosen.reduce((sum,item)=>sum+(item.is_market_price?0:Number(item.price||0)),0),
+        unresolvedMarket:chosen.some(item=>item.is_market_price)
+      };
+    }
+    const raw=String(byId('orderAmount')?.value??'').trim();
+    const amount=Number(raw);
+    return {
+      amount:raw!==''&&Number.isFinite(amount)?amount:0,
+      unresolvedMarket:false
+    };
+  }
+
+  function updateCheckoutAvailability(w=walletSnapshot){
+    const box=byId('walletPaymentBox');
+    if(!box||!isWalletEnabled()||!w)return;
+    const walletRadio=box.querySelector('input[value="wallet"]');
+    const onsiteRadio=box.querySelector('input[value="onsite"]');
+    const quote=currentCheckoutQuote();
+    const zeroAmount=Number(quote.amount)<1;
+    const walletStateBlocked=Number(w.balance)<0||w.status!=='active';
+    const blocked=walletStateBlocked||zeroAmount||quote.unresolvedMarket;
+    walletRadio.disabled=blocked;
+    if(blocked&&walletRadio.checked)onsiteRadio.checked=true;
+    let reason='';
+    if(walletStateBlocked)reason='暫時不能使用錢包結帳';
+    else if(quote.unresolvedMarket)reason='時價尚未確定，不能使用錢包結帳';
+    else if(zeroAmount)reason='訂單金額至少 1 元才能使用錢包結帳';
+    byId('walletCheckoutBalance').textContent='目前餘額：'+money(w.balance)+(reason?' · '+reason:'');
+  }
+
   async function refreshCheckout(){
     const box=byId('walletPaymentBox');
     if(!box||!isWalletEnabled())return;
     box.classList.remove('hidden');
     try{
       const w=await fetchWallet();
-      const walletRadio=box.querySelector('input[value="wallet"]');
-      const onsiteRadio=box.querySelector('input[value="onsite"]');
-      const blocked=Number(w.balance)<0||w.status!=='active';
-      walletRadio.disabled=blocked;
-      if(blocked&&walletRadio.checked)onsiteRadio.checked=true;
-      byId('walletCheckoutBalance').textContent='目前餘額：'+money(w.balance)+(blocked?' · 暫時不能使用錢包結帳':'');
+      updateCheckoutAvailability(w);
     }catch(error){
       const walletRadio=box.querySelector('input[value="wallet"]');
       walletRadio.disabled=true;
@@ -404,6 +438,11 @@
     const note=byId('orderNote').value.trim();
     const b=e.currentTarget.querySelector('button[type="submit"]');
     const method=e.currentTarget.querySelector('input[name="walletPaymentMethod"]:checked')?.value||'onsite';
+    if(method==='wallet'){
+      const quote=currentCheckoutQuote();
+      if(quote.unresolvedMarket)return toast('時價尚未確定，不能使用錢包結帳');
+      if(Number(quote.amount)<1)return toast('錢包結帳金額至少要 1 元');
+    }
     b.disabled=true;b.textContent='儲存中…';
     try{
       const structured=getTestItemsForSession().length>0;
@@ -444,7 +483,10 @@
     if(!dialog)return;
     new MutationObserver(()=>{if(dialog.open&&isWalletEnabled())refreshCheckout()})
       .observe(dialog,{attributes:true,attributeFilter:['open']});
-    byId('orderDialogForm')?.addEventListener('submit',handleWalletCheckout,true);
+    const orderForm=byId('orderDialogForm');
+    orderForm?.addEventListener('submit',handleWalletCheckout,true);
+    orderForm?.addEventListener('input',()=>{if(byId('orderDialog')?.open&&walletSnapshot)updateCheckoutAvailability(walletSnapshot)});
+    orderForm?.addEventListener('change',()=>{if(byId('orderDialog')?.open&&walletSnapshot)setTimeout(()=>updateCheckoutAvailability(walletSnapshot),0)});
   }
 
   injectUi();
