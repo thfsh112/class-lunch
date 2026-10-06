@@ -447,3 +447,5 @@
   .combo-choice-admin-row{grid-template-columns:1fr 1fr auto}
   .combo-choice-admin-row>input:first-child{grid-column:1/-1}
 }
+
+.combo-stats-section{margin-top:16px;padding-top:12px;border-top:1px solid #eee1dc}.combo-stats-section h3{margin:0 0 8px;font-size:14px;color:#6f554d}
