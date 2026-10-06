@@ -12,7 +12,7 @@ function applyDefaultSessionCutoff(force=false){
   if(!date||!cutoff)return;
   if(force||!cutoff.value)cutoff.value=defaultCutoffForDate(date);
 }
-let templates=[],sessions=[],students=[],editingTemplateId=null,editingSessionId=null,editingSessionOriginalDate='',editingStudentId=null,menuEditorItems=[],originalMenuItemIds=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null,currentAdminRole='';
+let templates=[],sessions=[],students=[],classes=[],editingTemplateId=null,editingSessionId=null,editingSessionOriginalDate='',editingStudentId=null,editingClassId=null,menuEditorItems=[],originalMenuItemIds=[],editingMarketOrderId=null,marketOrderItems=[],marketFixedTotal=0,realtimeChannel=null,realtimeTimer=null,currentAdminRole='';
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
 function adminPaymentEaster(paid,amount){
   const value=money(amount);
@@ -128,6 +128,10 @@ async function openAdminTab(tab){
   if(tab==='history')await loadHistoryOrders();
   if(tab==='backups')await loadBackups();
   if(tab==='unpaid')await loadUnpaidOrders();
+  if(tab==='classes'){
+    if(currentAdminRole!=='system_admin')return toast('只有 99 可以管理班級');
+    await loadClasses();
+  }
 }
 
 document.querySelectorAll('.tab[data-tab]').forEach(b=>b.addEventListener('click',()=>openAdminTab(b.dataset.tab)));
@@ -147,6 +151,9 @@ async function refresh(){
   $('adminApp').classList.toggle('hidden',!ok);
   $('loginStatus').textContent=ok?'已登入管理者':adminIdentity?'管理身分已登入，請輸入管理帳密。':'請先在首頁登入管理帳號。';
   if(!ok){stopAdminRealtime();return}
+  const classesTab=$('classesTabBtn');
+  if(classesTab)classesTab.classList.toggle('hidden',currentAdminRole!=='system_admin');
+  if(currentAdminRole!=='system_admin'&&!$('tab-classes')?.classList.contains('hidden'))await openAdminTab('students');
   startAdminRealtime();
   $('sessionDate').value=today();
   if($('backupDate')&&!$('backupDate').value)$('backupDate').value=today();
@@ -157,6 +164,142 @@ async function refresh(){
 async function loadTemplates(){const{data,error}=await db.from('menu_templates').select('*').order('created_at',{ascending:false});if(error)return toast(error.message);templates=data||[];$('templateCount').textContent=templates.length+' 份';renderTemplateList()}
 async function loadSessions(){const{data,error}=await db.from('meal_sessions').select('*,menu_templates(name,image_url)').order('meal_date',{ascending:false}).order('created_at',{ascending:false});if(error)return toast(error.message);sessions=data||[];renderSessionList();renderOverviewSelect();if(!$('tab-history')?.classList.contains('hidden'))loadHistoryOrders()}
 async function loadStudents(){const{data,error}=await db.from('students').select('id,auth_user_id,seat_number,name,active,must_setup,role,class_id,created_at').order('seat_number');if(error)return toast(error.message);students=data||[];renderStudentList()}
+async function callClassManager(body){
+  const{data,error}=await db.functions.invoke('class-lunch-classes',{body});
+  if(error||data?.error){
+    const code=data?.error||'class_management_failed';
+    const map={
+      system_admin_required:'只有 99 可以管理班級',
+      admin_session_required:'管理驗證已失效，請重新輸入管理帳密',
+      class_exists:'此班級已存在',
+      invalid_class_code:'班級代碼不正確，或與學生座號/99 衝突',
+      invalid_student_count:'學生人數必須介於 1～99',
+      invalid_class_name:'班級名稱不正確',
+      invalid_admin_gate_credentials:'班級管理頁帳密不正確',
+      class_not_found:'找不到班級'
+    };
+    throw new Error(map[code]||data?.detail||error?.message||code);
+  }
+  return data;
+}
+async function loadClasses(){
+  if(currentAdminRole!=='system_admin')return;
+  const data=await callClassManager({action:'list'}).catch(error=>{toast(error.message);return null});
+  if(!data)return;
+  classes=data.classes||[];
+  renderClassList();
+}
+function renderClassList(){
+  const el=$('classList');if(!el)return;
+  $('classCount').textContent=classes.length+' 班';
+  el.innerHTML=classes.map(c=>{
+    const admin=c.class_admin||{};
+    const status=c.active?'啟用中':'已停用';
+    const adminState=admin.auth_bound?'班管已建立 Auth':'班管尚未首次登入';
+    return '<div class="student-row">'+
+      '<span class="seat-badge">'+esc(c.code)+'</span>'+
+      '<div><b>'+esc(c.name||c.code+'班')+'</b><br>'+
+      '<span class="hint">學生 '+Number(c.student_count||0)+' / 設定 '+Number(c.student_capacity||0)+' 人 · '+status+
+      ' · 班管 '+esc(String(admin.seat_number??c.code))+' · '+adminState+
+      ' · 管理頁 '+esc(c.admin_gate_username||'—')+'</span></div>'+
+      '<div class="actions"><button class="small-btn" type="button" onclick="openClassDialog(\''+c.id+'\')">編輯</button></div>'+
+    '</div>';
+  }).join('')||'<div class="loading">尚無班級</div>';
+}
+function syncClassCreateDefaults(){
+  const code=String($('classCode')?.value||'').trim();
+  if(!code)return;
+  if(!$('className').value.trim())$('className').placeholder='留空自動使用「'+code+'班」';
+  if(!$('classGateUsername').value.trim())$('classGateUsername').placeholder='留空自動使用 tnfsh'+code;
+  if(!$('classGatePassword').value)$('classGatePassword').placeholder='留空自動使用 tnfsh'+code;
+}
+$('classCode')?.addEventListener('input',syncClassCreateDefaults);
+$('classCreateForm')?.addEventListener('submit',async e=>{
+  e.preventDefault();
+  if(currentAdminRole!=='system_admin')return toast('只有 99 可以新增班級');
+  const code=String($('classCode').value||'').trim();
+  const studentCount=Number($('classStudentCount').value);
+  if(!/^\d{2,4}$/.test(code))return toast('班級代碼請輸入 2～4 位數字');
+  if(!Number.isInteger(studentCount)||studentCount<1||studentCount>99)return toast('學生人數請輸入 1～99');
+  if(Number(code)===99||Number(code)<=studentCount)return toast('班級代碼不可與學生座號或 99 衝突');
+  const btn=e.submitter; if(btn){btn.disabled=true;btn.textContent='建立中…';}
+  try{
+    const data=await callClassManager({
+      action:'create',
+      code,
+      student_count:studentCount,
+      name:String($('className').value||'').trim()||code+'班',
+      gate_username:String($('classGateUsername').value||'').trim()||'tnfsh'+code,
+      gate_password:$('classGatePassword').value||'tnfsh'+code
+    });
+    toast('已建立 '+code+' 班，共 '+studentCount+' 位學生');
+    e.target.reset();
+    $('classStudentCount').value='35';
+    syncClassCreateDefaults();
+    await loadClasses();
+  }catch(error){toast(error.message)}
+  finally{if(btn){btn.disabled=false;btn.textContent='建立班級';}}
+});
+$('refreshClassesBtn')?.addEventListener('click',loadClasses);
+function openClassDialog(id){
+  if(currentAdminRole!=='system_admin')return toast('只有 99 可以管理班級');
+  const c=classes.find(x=>x.id===id);if(!c)return;
+  editingClassId=id;
+  $('editClassCode').textContent='班級 '+c.code+' · 學生設定 '+Number(c.student_capacity||0)+' 人';
+  $('editClassName').value=c.name||c.code+'班';
+  $('editClassActive').checked=!!c.active;
+  $('editClassGateUsername').value=c.admin_gate_username||'tnfsh'+c.code;
+  $('editClassGatePassword').value='';
+  $('editClassAdminPassword').value='';
+  const admin=c.class_admin||{};
+  $('editClassAccountInfo').textContent='班管主登入：'+c.code+' / '+String(admin.seat_number??c.code)+'；'+(admin.auth_bound?'Auth 已建立':'尚未首次登入');
+  $('classDialog').showModal();
+}
+$('classEditForm')?.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const c=classes.find(x=>x.id===editingClassId);if(!c)return;
+  const btn=e.submitter;if(btn){btn.disabled=true;btn.textContent='儲存中…';}
+  try{
+    const data=await callClassManager({
+      action:'update',
+      class_id:c.id,
+      name:$('editClassName').value.trim(),
+      active:$('editClassActive').checked,
+      gate_username:$('editClassGateUsername').value.trim(),
+      gate_password:$('editClassGatePassword').value
+    });
+    classes=data.classes||classes;
+    renderClassList();
+    $('classDialog').close();
+    toast('班級設定已更新');
+  }catch(error){toast(error.message)}
+  finally{if(btn){btn.disabled=false;btn.textContent='儲存班級';}}
+});
+$('resetClassAdminPasswordBtn')?.addEventListener('click',async()=>{
+  const c=classes.find(x=>x.id===editingClassId);if(!c)return;
+  const btn=$('resetClassAdminPasswordBtn');btn.disabled=true;btn.textContent='重設中…';
+  try{
+    const password=$('editClassAdminPassword').value;
+    await callClassManager({action:'reset_admin_password',class_id:c.id,password});
+    $('editClassAdminPassword').value='';
+    toast(password?'班管主登入密碼已重設':'班管主登入密碼已恢復預設');
+    await loadClasses();
+    openClassDialog(c.id);
+  }catch(error){toast(error.message)}
+  finally{btn.disabled=false;btn.textContent='重設班管主登入密碼';}
+});
+$('resetClassGateBtn')?.addEventListener('click',async()=>{
+  const c=classes.find(x=>x.id===editingClassId);if(!c)return;
+  const btn=$('resetClassGateBtn');btn.disabled=true;btn.textContent='恢復中…';
+  try{
+    const data=await callClassManager({action:'update',class_id:c.id,reset_gate_default:true});
+    classes=data.classes||classes;
+    renderClassList();
+    openClassDialog(c.id);
+    toast('管理頁帳密已恢復預設');
+  }catch(error){toast(error.message)}
+  finally{btn.disabled=false;btn.textContent='管理頁帳密恢復預設';}
+});
 
 function renderTemplateSelect(){
   $('sessionTemplate').innerHTML=templates.filter(t=>t.active).map(t=>'<option value="'+t.id+'">'+esc(t.name)+'</option>').join('');
