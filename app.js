@@ -1,10 +1,12 @@
 const{createClient}=supabase;
 const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage,storageKey:'class-lunch-user-auth'}});
 const $=id=>document.getElementById(id);
-let student=null,sessions=[],orders=[],menuItems=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,realtimeChannel=null,realtimeTimer=null,deferredInstallPrompt=null,notificationPermissionStatus=null,pushPermissionSyncing=false;
+let student=null,sessions=[],orders=[],menuItems=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,realtimeChannel=null,realtimeTimer=null,realtimeRefreshMode='',studentViewClassId=null,loadedMenuTemplateKey='',deferredInstallPrompt=null,notificationPermissionStatus=null,pushPermissionSyncing=false;
 const money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
 const PUSH_VAPID_PUBLIC_KEY='BIfooHITgKhbwNm9ufy7fUdoyaU46cxxSFFoAOPQrKHJ4RPHzsqYQb9CEMWflB4PlXmpyptPHWl-fvgiWjeW_kE';
 const PUSH_DEVICE_OPT_IN_KEY='class-lunch-push-device-opt-in-v1';
+const PUSH_LAST_SYNC_KEY='class-lunch-push-last-sync-v1';
+const PUSH_SYNC_TTL_MS=12*60*60*1000;
 function devicePushOptedIn(){return localStorage.getItem(PUSH_DEVICE_OPT_IN_KEY)==='1'}
 function setDevicePushOptIn(enabled){localStorage.setItem(PUSH_DEVICE_OPT_IN_KEY,enabled?'1':'0')}
 async function initializeDevicePushPreference(){
@@ -295,10 +297,26 @@ window.addEventListener('appinstalled',()=>{
   refreshInstallStatus();
   toast('班級訂飯已安裝');
 });
-async function upsertCurrentPushSubscription(subscription){
-  if(!subscription)return;
+function currentPushBindingKey(endpoint){
+  if(!student)return '';
+  const classContext=student.role==='system_admin'
+    ?String(localStorage.getItem('class-lunch-last-class')||'99').trim()
+    :String(student.class_id||'');
+  return [String(endpoint||''),String(student.id||''),classContext].join('|');
+}
+function pushSyncIsFresh(endpoint){
+  try{
+    const saved=JSON.parse(localStorage.getItem(PUSH_LAST_SYNC_KEY)||'null');
+    return !!saved
+      && saved.key===currentPushBindingKey(endpoint)
+      && Date.now()-Number(saved.at||0)<PUSH_SYNC_TTL_MS;
+  }catch{return false}
+}
+async function upsertCurrentPushSubscription(subscription,force=false){
+  if(!subscription||!student)return;
   const json=subscription.toJSON();
   if(!json.endpoint||!json.keys?.p256dh||!json.keys?.auth)throw new Error('subscription_keys_missing');
+  if(!force&&pushSyncIsFresh(json.endpoint))return;
   const{data,error}=await db.functions.invoke('class-lunch-push',{body:{
     action:'subscribe',
     subscription:{
@@ -312,6 +330,10 @@ async function upsertCurrentPushSubscription(subscription){
     const bind=await db.rpc('class_lunch_bind_system_admin_push',{p_endpoint:json.endpoint});
     if(bind.error)throw bind.error;
   }
+  localStorage.setItem(PUSH_LAST_SYNC_KEY,JSON.stringify({
+    key:currentPushBindingKey(json.endpoint),
+    at:Date.now()
+  }));
 }
 async function syncPushAfterPermissionGranted(showToast=true){
   if(pushPermissionSyncing||Notification.permission!=='granted'||!devicePushOptedIn())return;
@@ -402,7 +424,7 @@ async function enablePushNotifications(){
         applicationServerKey:urlBase64ToUint8Array(PUSH_VAPID_PUBLIC_KEY)
       });
     }
-    await upsertCurrentPushSubscription(sub);
+    await upsertCurrentPushSubscription(sub,true);
     setDevicePushOptIn(true);
     await refreshPushStatus();
     toast('此裝置的訂餐通知已開啟');
@@ -442,7 +464,7 @@ async function rebuildPushNotifications(){
       applicationServerKey:urlBase64ToUint8Array(PUSH_VAPID_PUBLIC_KEY)
     });
     setDevicePushOptIn(true);
-    await upsertCurrentPushSubscription(newSub);
+    await upsertCurrentPushSubscription(newSub,true);
     await refreshPushStatus();
     toast('已重新建立這支裝置的推播連線');
   }catch(error){
@@ -455,6 +477,7 @@ async function rebuildPushNotifications(){
 
 async function disablePushNotifications(){
   setDevicePushOptIn(false);
+  localStorage.removeItem(PUSH_LAST_SYNC_KEY);
   let cleanupFailed=false;
   try{
     const sub=await getCurrentPushSubscription();
@@ -481,6 +504,7 @@ async function disablePushNotifications(){
   }
 }
 async function detachCurrentPushBinding(){
+  localStorage.removeItem(PUSH_LAST_SYNC_KEY);
   try{
     const sub=await getCurrentPushSubscription();
     if(!sub)return;
@@ -589,7 +613,7 @@ $('setupForm').addEventListener('submit',async e=>{
   $('setupForm').reset();toast('設定完成');await refresh();
 });
 
-$('logoutBtn').addEventListener('click',async()=>{localStorage.removeItem('class-lunch-admin-gate');await detachPushBeforeLogout();await db.auth.signOut({scope:'local'});student=null;refresh()});
+$('logoutBtn').addEventListener('click',async()=>{localStorage.removeItem('class-lunch-admin-gate');await detachPushBeforeLogout();await db.auth.signOut({scope:'local'});student=null;studentViewClassId=null;loadedMenuTemplateKey='';refresh()});
 $('accountBtn').addEventListener('click',openAccountDialog);
 $('notifyBtn').addEventListener('click',openAccountDialog);
 $('enablePushBtn').addEventListener('click',enablePushNotifications);
@@ -646,12 +670,7 @@ async function refresh(){
     $('welcomeText').textContent='登入後查看開放中的訂餐。';return;
   }
 
-  const{data:{user},error:userError}=await db.auth.getUser();
-  if(userError||!user){
-    $('welcomeText').textContent='登入狀態仍保留，等待網路恢復後會自動重試。';
-    return;
-  }
-
+  const user=session.user;
   const{data:s,error}=await db.from('students').select('id,seat_number,name,active,must_setup,role,class_id,classes(code,name)').eq('auth_user_id',user.id).maybeSingle();
   if(error){
     $('welcomeText').textContent='登入狀態仍保留，學生資料暫時讀取失敗。';
@@ -659,6 +678,18 @@ async function refresh(){
   }
   if(!s||!s.active){await db.auth.signOut();student=null;toast('此學生帳號目前無法使用');return refresh()}
   student=s;
+  studentViewClassId=s.class_id||null;
+  if(s.role==='system_admin'){
+    const classCode=String(localStorage.getItem('class-lunch-last-class')||'99').trim()||'99';
+    const{data:activeClass,error:classError}=await db.from('classes')
+      .select('id,code').eq('code',classCode).eq('active',true).maybeSingle();
+    if(classError||!activeClass){
+      studentViewClassId=null;
+      $('welcomeText').textContent='目前登入班級不存在或已停用';
+      return;
+    }
+    studentViewClassId=activeClass.id;
+  }
   window.dispatchEvent(new Event('class-lunch-student-ready'));
   watchNotificationPermission();$('loginBox').classList.add('hidden');$('heroAccount').classList.remove('hidden');$('logoutBtn').classList.remove('hidden');$('historyBtn').classList.remove('hidden');
   const isManager=['system_admin','class_admin'].includes(String(s.role||''));
@@ -683,64 +714,73 @@ async function refresh(){
   await loadSessions();
 }
 
-async function loadSessions(){
-  const{data:ss,error:se}=await db.from('meal_sessions')
+async function loadOrderState(){
+  orders=[];orderItemsByOrder={};
+  if(!student||!sessions.length)return;
+  const sessionIds=sessions.map(s=>s.id);
+  const{data:os,error:oe}=await db.from('orders')
+    .select('id,meal_session_id,item_name,unit_price,note,paid,payment_method,onsite_received,created_at,menu_item_id')
+    .eq('student_id',student.id)
+    .in('meal_session_id',sessionIds)
+    .order('created_at',{ascending:false});
+  if(oe)throw oe;
+  orders=os||[];
+  const orderIds=orders.map(o=>o.id);
+  if(!orderIds.length)return;
+  const{data:oi,error:oie}=await db.from('order_items')
+    .select('order_id,menu_item_id,quantity,unit_price,is_market_price,market_price_amount')
+    .in('order_id',orderIds)
+    .order('id');
+  if(oie)throw oie;
+  for(const row of (oi||[])){
+    if(!orderItemsByOrder[row.order_id])orderItemsByOrder[row.order_id]=[];
+    orderItemsByOrder[row.order_id].push(row);
+  }
+}
+async function loadMenuState(force=false){
+  const templateIds=[...new Set(sessions.map(s=>s.menu_template_id))].sort((a,b)=>Number(a)-Number(b));
+  const key=templateIds.join(',');
+  if(!templateIds.length){
+    menuItems=[];loadedMenuTemplateKey='';return;
+  }
+  if(!force&&key===loadedMenuTemplateKey&&menuItems.length)return;
+  const{data:mi,error:me}=await db.from('menu_items')
+    .select('id,menu_template_id,category,name,price,is_market_price,active,sort_order')
+    .in('menu_template_id',templateIds)
+    .eq('active',true)
+    .order('sort_order')
+    .order('id');
+  if(me)throw me;
+  menuItems=mi||[];
+  loadedMenuTemplateKey=key;
+}
+async function refreshOwnOrders(){
+  clearTimeout(realtimeTimer);
+  realtimeRefreshMode='';
+  try{
+    await loadOrderState();
+    renderSessions();
+  }catch(error){
+    console.warn('student_order_refresh_failed',error);
+  }
+}
+async function loadSessions(options={}){
+  const forceMenus=options?.forceMenus===true;
+  let q=db.from('meal_sessions')
     .select('id,meal_date,cutoff_at,is_active,class_id,menu_template_id,menu_templates(id,name,image_url,active)')
     .eq('is_active',true)
-    .gte('meal_date',today())
-    .order('meal_date');
+    .gte('meal_date',today());
+  if(studentViewClassId)q=q.eq('class_id',studentViewClassId);
+  const{data:ss,error:se}=await q.order('meal_date');
   if(se)return toast(se.message);
 
-  let visibleSessions=ss||[];
-  if(student?.role==='system_admin'){
-    const classCode=String(localStorage.getItem('class-lunch-last-class')||'').trim();
-    const{data:activeClass,error:classError}=await db.from('classes')
-      .select('id,code').eq('code',classCode).eq('active',true).maybeSingle();
-    if(classError||!activeClass){
-      sessions=[];$('menuCount').textContent='0 份';renderSessionPicker();renderSessions();
-      return toast('目前登入班級不存在或已停用');
-    }
-    visibleSessions=visibleSessions.filter(x=>x.class_id===activeClass.id);
-  }
-
-  sessions=visibleSessions.filter(x=>x.menu_templates?.active!==false);
+  sessions=(ss||[]).filter(x=>x.menu_templates?.active!==false);
   $('menuCount').textContent=sessions.length+' 份';
 
-  orders=[];menuItems=[];orderItemsByOrder={};
-  if(sessions.length){
-    const sessionIds=sessions.map(s=>s.id);
-    const templateIds=[...new Set(sessions.map(s=>s.menu_template_id))];
-
-    const [{data:os,error:oe},{data:mi,error:me}]=await Promise.all([
-      db.from('orders')
-        .select('id,meal_session_id,item_name,unit_price,note,paid,payment_method,onsite_received,created_at,menu_item_id')
-        .eq('student_id',student.id)
-        .in('meal_session_id',sessionIds)
-        .order('created_at',{ascending:false}),
-      db.from('menu_items')
-        .select('id,menu_template_id,category,name,price,is_market_price,active,sort_order')
-        .in('menu_template_id',templateIds)
-        .eq('active',true)
-        .order('sort_order')
-        .order('id')
-    ]);
-    if(oe||me)return toast((oe||me).message);
-
-    orders=os||[];
-    menuItems=mi||[];
-
-    const orderIds=orders.map(o=>o.id);
-    if(orderIds.length){
-      const{data:oi,error:oie}=await db.from('order_items')
-        .select('order_id,menu_item_id,quantity,unit_price,is_market_price,market_price_amount')
-        .in('order_id',orderIds)
-        .order('id');
-      if(oie)return toast('讀取訂單品項失敗：'+oie.message);
-      for(const row of (oi||[])){
-        if(!orderItemsByOrder[row.order_id])orderItemsByOrder[row.order_id]=[];
-        orderItemsByOrder[row.order_id].push(row);
-      }
-    }
+  try{
+    await Promise.all([loadOrderState(),loadMenuState(forceMenus)]);
+  }catch(error){
+    return toast('讀取訂餐資料失敗：'+String(error?.message||error));
   }
 
   renderSessionPicker();
@@ -849,13 +889,13 @@ $('orderDialogForm').addEventListener('submit',async e=>{
   }
   b.disabled=false;b.textContent='儲存訂單';
   if(error)return toast('送出失敗：'+error.message);
-  $('orderDialog').close();toast('訂單已儲存');await loadSessions();
+  $('orderDialog').close();toast('訂單已儲存');await refreshOwnOrders();
 });
 async function cancelOrder(sessionId){
   if(!confirm('確定取消這筆訂單？'))return;
   const{error}=await db.rpc('cancel_class_lunch_order_v3',{p_session_id:sessionId});
   if(error)return toast('取消失敗：'+error.message);
-  toast('訂單已取消');await loadSessions();
+  toast('訂單已取消');await refreshOwnOrders();
 }
 async function openHistory(){
   if(!student)return;
@@ -888,17 +928,31 @@ async function openHistory(){
 function openImage(u){$('largeImage').src=u;$('imageModal').classList.remove('hidden');document.body.style.overflow='hidden'}
 function closeImage(e){if(e&&e.target!==$('imageModal')&&!e.target.classList.contains('close'))return;$('imageModal').classList.add('hidden');$('largeImage').src='';document.body.style.overflow=''}
 document.addEventListener('click',e=>{const p=e.target.closest('.photo-button');if(p)openImage(p.dataset.imageUrl)});
-function scheduleStudentRealtimeRefresh(){
+function scheduleStudentRealtimeRefresh(mode='orders'){
+  if(mode==='full')realtimeRefreshMode='full';
+  else if(!realtimeRefreshMode)realtimeRefreshMode='orders';
   clearTimeout(realtimeTimer);
-  realtimeTimer=setTimeout(()=>{if(student)loadSessions()},350);
+  realtimeTimer=setTimeout(async()=>{
+    if(!student)return;
+    const modeNow=realtimeRefreshMode||'orders';
+    realtimeRefreshMode='';
+    if(modeNow==='full')await loadSessions({forceMenus:true});
+    else await refreshOwnOrders();
+  },350);
 }
 function startStudentRealtime(){
-  if(realtimeChannel||!student||document.hidden||$('studentApp')?.classList.contains('hidden'))return;
-  realtimeChannel=db.channel('class-lunch-student-realtime')
-    .on('postgres_changes',{event:'*',schema:'public',table:'orders'},scheduleStudentRealtimeRefresh)
-    .on('postgres_changes',{event:'*',schema:'public',table:'meal_sessions'},scheduleStudentRealtimeRefresh)
-    .on('postgres_changes',{event:'*',schema:'public',table:'menu_items'},scheduleStudentRealtimeRefresh)
-    .on('postgres_changes',{event:'*',schema:'public',table:'menu_templates'},scheduleStudentRealtimeRefresh)
+  if(realtimeChannel||!student||!studentViewClassId||document.hidden||$('studentApp')?.classList.contains('hidden'))return;
+  realtimeChannel=db.channel('class-lunch-student-realtime-'+String(student.id))
+    .on('postgres_changes',{
+      event:'*',schema:'public',table:'orders',
+      filter:'student_id=eq.'+String(student.id)
+    },()=>scheduleStudentRealtimeRefresh('orders'))
+    .on('postgres_changes',{
+      event:'*',schema:'public',table:'meal_sessions',
+      filter:'class_id=eq.'+String(studentViewClassId)
+    },()=>scheduleStudentRealtimeRefresh('full'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'menu_items'},()=>scheduleStudentRealtimeRefresh('full'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'menu_templates'},()=>scheduleStudentRealtimeRefresh('full'))
     .subscribe();
 }
 function stopStudentRealtime(){
