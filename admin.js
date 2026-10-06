@@ -111,9 +111,9 @@ async function showAdminClassPicker(forceReload=false){
   $('adminClassPickerBox').classList.remove('hidden');
   $('loginStatus').textContent='請選擇管理班級';
   if(forceReload||!classes.length){
-    const data=await callClassManager({action:'list'}).catch(error=>{toast(error.message);return null});
-    if(!data)return;
-    classes=data.classes||[];
+    const{data,error}=await db.from('classes').select('id,code,name,active').eq('active',true).order('code');
+    if(error)return toast('班級清單讀取失敗');
+    classes=data||[];
   }
   renderAdminClassPicker();
 }
@@ -162,7 +162,7 @@ $('adminClassPickerForm')?.addEventListener('submit',async e=>{
   const btn=e.submitter;
   if(btn){btn.disabled=true;btn.textContent='切換中…';}
   try{
-    const{data,error}=await db.functions.invoke('class-lunch-admin-login',{body:{action:'select_class',class_code:code}});
+    const{data,error}=await db.rpc('class_lunch_admin_select_class',{p_class_code:code});
     if(error||data?.error)return toast('班級切換失敗，請重新整理後再試');
     selectedAdminClassId=String(data.class_id||'');
     selectedAdminClassCode=String(data.class_code||code);
