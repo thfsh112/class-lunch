@@ -103,7 +103,21 @@
   </section>
 
   <section id="tab-classes" class="tab-page hidden">
-    <div class="panel">
+    <div id="classRosterPanel" class="panel">
+      <div class="section-head">
+        <div>
+          <h2>本班人數管理</h2>
+          <p id="classRosterHint" class="hint">調整目前班級的學生號碼數；歷史訂單與金流紀錄不會刪除。</p>
+        </div>
+      </div>
+      <form id="classRosterForm" class="admin-form-grid">
+        <label>學生人數<input id="classRosterCount" type="number" inputmode="numeric" min="1" max="99" required></label>
+        <button id="decreaseClassRosterBtn" class="small-btn danger" type="button">－ 刪除最後號碼</button>
+        <button id="increaseClassRosterBtn" class="small-btn" type="button">＋ 增加下一號</button>
+        <button class="primary" type="submit">套用人數</button>
+      </form>
+    </div>
+    <div id="systemClassCreatePanel" class="panel">
       <div class="section-head">
         <div>
           <h2>新增班級</h2>
@@ -120,7 +134,7 @@
       </form>
       <p class="hint">班管主登入：班級代碼 / 班級代碼 / 4 碼初始密碼，例如 113 班為 113 / 113 / 0113。老師初始密碼為 tch；學生為座號補成 3 碼。學生人數可設 1～99；班級代碼不可落在學生座號範圍內。</p>
     </div>
-    <div class="panel">
+    <div id="systemClassListPanel" class="panel">
       <div class="section-head">
         <div><h2>班級列表</h2><p class="hint">停用班級後，該班既有登入也不再具有可用班級 context；資料不會刪除。</p></div>
         <div class="btnrow"><span id="classCount"></span><button id="refreshClassesBtn" class="small-btn" type="button">重新整理</button></div>
