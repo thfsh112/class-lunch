@@ -678,13 +678,25 @@ async function refresh(){
 
 async function loadSessions(){
   const{data:ss,error:se}=await db.from('meal_sessions')
-    .select('id,meal_date,cutoff_at,is_active,menu_template_id,menu_templates(id,name,image_url,active)')
+    .select('id,meal_date,cutoff_at,is_active,class_id,menu_template_id,menu_templates(id,name,image_url,active)')
     .eq('is_active',true)
     .gte('meal_date',today())
     .order('meal_date');
   if(se)return toast(se.message);
 
-  sessions=(ss||[]).filter(x=>x.menu_templates?.active!==false);
+  let visibleSessions=ss||[];
+  if(student?.role==='system_admin'){
+    const classCode=String(localStorage.getItem('class-lunch-last-class')||'').trim();
+    const{data:activeClass,error:classError}=await db.from('classes')
+      .select('id,code').eq('code',classCode).eq('active',true).maybeSingle();
+    if(classError||!activeClass){
+      sessions=[];$('menuCount').textContent='0 份';renderSessionPicker();renderSessions();
+      return toast('目前登入班級不存在或已停用');
+    }
+    visibleSessions=visibleSessions.filter(x=>x.class_id===activeClass.id);
+  }
+
+  sessions=visibleSessions.filter(x=>x.menu_templates?.active!==false);
   $('menuCount').textContent=sessions.length+' 份';
 
   orders=[];menuItems=[];orderItemsByOrder={};
