@@ -821,7 +821,7 @@ $('menuConfigForm')?.addEventListener('submit',async e=>{
     if(activeChoices.length<Number(g.min_select))return toast('「'+g.name+'」啟用中的選項不足');
     if(activeChoices.some(ch=>!String(ch.name||'').trim()))return toast('「'+g.name+'」有未命名選項');
     if(activeChoices.some(ch=>!Number.isInteger(Number(ch.price_delta))||Number(ch.price_delta)<-10000||Number(ch.price_delta)>10000))return toast('「'+g.name+'」有加價格式不正確');
-    if(Number(g.max_select)===1&&activeChoices.filter(ch=>ch.is_default).length>1)return toast('「'+g.name+'」最多只能有一個預設選項');
+    if(activeChoices.filter(ch=>ch.is_default).length>Number(g.max_select))return toast('「'+g.name+'」預設選項數量不能超過最多可選數');
   }
 
   const submit=e.submitter; if(submit){submit.disabled=true;submit.textContent='儲存中…'}
