@@ -1391,11 +1391,17 @@ function scheduleAdminRealtimeRefresh(kind){
   },350);
 }
 function startAdminRealtime(){
-  if(realtimeChannel||document.hidden||$('adminApp')?.classList.contains('hidden'))return;
-  realtimeChannel=db.channel('class-lunch-admin-realtime')
-    .on('postgres_changes',{event:'*',schema:'public',table:'orders'},()=>scheduleAdminRealtimeRefresh('orders'))
+  if(realtimeChannel||!selectedAdminClassId||document.hidden||$('adminApp')?.classList.contains('hidden'))return;
+  realtimeChannel=db.channel('class-lunch-admin-realtime-'+selectedAdminClassId)
+    .on('postgres_changes',{
+      event:'*',schema:'public',table:'orders',
+      filter:'class_id=eq.'+selectedAdminClassId
+    },()=>scheduleAdminRealtimeRefresh('orders'))
     .on('postgres_changes',{event:'*',schema:'public',table:'order_items'},()=>scheduleAdminRealtimeRefresh('orders'))
-    .on('postgres_changes',{event:'*',schema:'public',table:'meal_sessions'},()=>scheduleAdminRealtimeRefresh('sessions'))
+    .on('postgres_changes',{
+      event:'*',schema:'public',table:'meal_sessions',
+      filter:'class_id=eq.'+selectedAdminClassId
+    },()=>scheduleAdminRealtimeRefresh('sessions'))
     .on('postgres_changes',{event:'*',schema:'public',table:'menu_items'},()=>scheduleAdminRealtimeRefresh('orders'))
     .on('postgres_changes',{event:'*',schema:'public',table:'menu_templates'},()=>scheduleAdminRealtimeRefresh('sessions'))
     .subscribe();
