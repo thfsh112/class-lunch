@@ -112,7 +112,7 @@
       </div>
       <div id="classRosterSeats" class="btnrow"></div>
       <form id="classRosterForm" class="admin-form-grid">
-        <label>座號<input id="classRosterSeat" type="number" inputmode="numeric" min="1" max="99" required></label>
+        <label>座號<input id="classRosterSeat" type="number" inputmode="numeric" min="1" max="98" required></label>
         <button id="addClassRosterSeatBtn" class="primary" type="submit">新增／恢復座號</button>
         <button id="removeClassRosterSeatBtn" class="small-btn danger" type="button">移除座號</button>
       </form>
@@ -126,13 +126,13 @@
       </div>
       <form id="classCreateForm" class="admin-form-grid">
         <label>班級代碼<input id="classCode" inputmode="numeric" maxlength="4" placeholder="例如：113" required></label>
-        <label>學生人數<input id="classStudentCount" type="number" inputmode="numeric" min="1" max="99" value="35" required></label>
+        <label>學生人數<input id="classStudentCount" type="number" inputmode="numeric" min="1" max="98" value="35" required></label>
         <label>班級名稱<input id="className" maxlength="100" placeholder="留空自動使用「113班」"></label>
         <label>管理頁帳號<input id="classGateUsername" maxlength="100" placeholder="留空自動使用 tnfsh113"></label>
         <label>管理頁密碼<input id="classGatePassword" type="password" maxlength="100" placeholder="留空自動使用 tnfsh113"></label>
         <button class="primary" type="submit">建立班級</button>
       </form>
-      <p class="hint">班管主登入：班級代碼 / 班級代碼 / 4 碼初始密碼，例如 113 班為 113 / 113 / 0113。老師初始密碼為 tch；學生為座號補成 3 碼。學生人數可設 1～99；班級代碼不可落在學生座號範圍內。</p>
+      <p class="hint">班管主登入：班級代碼 / 班級代碼 / 4 碼初始密碼，例如 113 班為 113 / 113 / 0113。老師初始密碼為 tch；學生為座號補成 3 碼。學生人數可設 1～98；99 號固定保留給系統管理員，班級代碼不可落在學生座號範圍內。</p>
     </div>
     <div id="systemClassListPanel" class="panel">
       <div class="section-head">
