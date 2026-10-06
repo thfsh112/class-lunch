@@ -308,6 +308,10 @@ async function upsertCurrentPushSubscription(subscription){
   }});
   if(error)throw error;
   if(data?.error)throw new Error(data.error);
+  if(student?.role==='system_admin'){
+    const bind=await db.rpc('class_lunch_bind_system_admin_push',{p_endpoint:json.endpoint});
+    if(bind.error)throw bind.error;
+  }
 }
 async function syncPushAfterPermissionGranted(showToast=true){
   if(pushPermissionSyncing||Notification.permission!=='granted'||!devicePushOptedIn())return;
