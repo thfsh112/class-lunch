@@ -91,7 +91,9 @@
           </div>
           <label class="check-row"><input type="radio" name="walletPaymentMethod" value="wallet"> 錢包結帳</label>
           <label class="check-row"><input type="radio" name="walletPaymentMethod" value="onsite" checked> 現場結帳</label>`;
-        form.insertBefore(box,actions);
+        const scrollArea=byId('orderDialogScroll');
+        if(scrollArea)scrollArea.appendChild(box);
+        else form.insertBefore(box,actions);
       }
     }
   }
