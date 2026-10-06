@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>班級訂飯 🍱</title>
-<link rel="icon" type="image/png" href="./icon-192.png?v=20261005-94">
-<link rel="apple-touch-icon" href="./icon-192.png?v=20261005-94">
+<link rel="icon" type="image/png" href="./icon-192.png?v=20261006-95">
+<link rel="apple-touch-icon" href="./icon-192.png?v=20261006-95">
 <meta name="theme-color" content="#f7e7c6">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="班級訂飯">
-<link rel="manifest" href="./manifest.webmanifest?v=20261005-94">
-<link rel="stylesheet" href="style.css?v=20261005-94">
+<link rel="manifest" href="./manifest.webmanifest?v=20261006-95">
+<link rel="stylesheet" href="style.css?v=20261006-95">
 </head>
 <body>
 <header class="top hero">
@@ -40,7 +40,8 @@
 <section id="loginBox" class="panel login-panel">
   <h2>帳號登入</h2>
   <form id="loginForm">
-    <label>帳號<input id="seatLogin" type="text" inputmode="text" required autocomplete="username"></label>
+    <label>班級<input id="classLogin" type="text" inputmode="numeric" required autocomplete="organization" placeholder="例如 112"></label>
+    <label>座號<input id="seatLogin" type="text" inputmode="text" required autocomplete="username"></label>
     <label>密碼<input id="passwordLogin" type="password" required autocomplete="current-password"></label>
     <button class="primary" type="submit">登入</button>
   </form>
@@ -163,11 +164,11 @@
 </dialog>
 
 <div id="imageModal" class="modal hidden" onclick="closeImage(event)"><div class="image-viewer" onclick="event.stopPropagation()"><button type="button" class="close" onclick="closeImage()">×</button><img id="largeImage" alt="菜單大圖"></div></div>
-<button class="app-version" type="button" data-app-version title="點一下重新載入最新版">1.86</button>
+<button class="app-version" type="button" data-app-version title="點一下重新載入最新版">1.87</button>
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.APP_CONFIG={supabaseUrl:"https://roynzxilxumfzzuezelg.supabase.co",publishableKey:"sb_publishable_nvmHzVjH7bZ8F9cnJYzKCg_PSPlhCXU"};</script>
-<script src="pwa.js?v=20261005-94"></script>
-<script src="app.js?v=20261005-94"></script>
-<script src="wallet.js?v=20261005-94"></script>
+<script src="pwa.js?v=20261006-95"></script>
+<script src="app.js?v=20261006-95"></script>
+<script src="wallet.js?v=20261006-95"></script>
 </body></html>
