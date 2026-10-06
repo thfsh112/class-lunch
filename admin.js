@@ -423,7 +423,7 @@ function renderClassList(){
     return '<div class="student-row">'+
       '<span class="seat-badge">'+esc(c.code)+'</span>'+
       '<div><b>'+esc(c.name||c.code+'班')+'</b><br>'+
-      '<span class="hint">學生 '+Number(c.student_count||0)+' / 設定 '+Number(c.student_capacity||0)+' 人 · '+status+
+      '<span class="hint">啟用學生 '+Number(c.student_count||0)+' 人 · '+status+
       adminText+
       ' · 管理頁 '+esc(c.admin_gate_username||'—')+'</span></div>'+
       '<div class="actions"><button class="small-btn" type="button" onclick="openClassDialog(\''+c.id+'\')">編輯</button></div>'+
