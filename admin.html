@@ -26,6 +26,7 @@
       <button class="tab" type="button" data-tab="templates">菜單庫</button>
       <button class="tab" type="button" data-tab="backups">備份</button>
       <button class="tab" type="button" data-tab="logs">操作紀錄</button>
+      <button id="classesTabBtn" class="tab hidden" type="button" data-tab="classes">班級管理</button>
     </div>
 
     <div class="admin-tabs admin-subtabs hidden" data-admin-subgroup="money">
@@ -83,6 +84,32 @@
     <div class="panel">
       <div class="section-head"><h2>學生名單</h2><span id="studentCount"></span></div>
       <div id="studentList"></div>
+    </div>
+  </section>
+
+  <section id="tab-classes" class="tab-page hidden">
+    <div class="panel">
+      <div class="section-head">
+        <div>
+          <h2>新增班級</h2>
+          <p class="hint">只限 99 系統管理員。建立時會一次初始化老師、1～35 號、班級管理員、錢包與班級錢包設定。</p>
+        </div>
+      </div>
+      <form id="classCreateForm" class="admin-form-grid">
+        <label>班級代碼<input id="classCode" inputmode="numeric" maxlength="4" placeholder="例如：113" required></label>
+        <label>班級名稱<input id="className" maxlength="100" placeholder="留空自動使用「113班」"></label>
+        <label>管理頁帳號<input id="classGateUsername" maxlength="100" placeholder="留空自動使用 tnfsh113"></label>
+        <label>管理頁密碼<input id="classGatePassword" type="password" maxlength="100" placeholder="留空自動使用 tnfsh113"></label>
+        <button class="primary" type="submit">建立班級</button>
+      </form>
+      <p class="hint">班管主登入：班級代碼 / 班級代碼 / 4 碼初始密碼，例如 113 班為 113 / 113 / 0113。老師初始密碼為 tch；學生為座號補成 3 碼。</p>
+    </div>
+    <div class="panel">
+      <div class="section-head">
+        <div><h2>班級列表</h2><p class="hint">停用班級後，該班既有登入也不再具有可用班級 context；資料不會刪除。</p></div>
+        <div class="btnrow"><span id="classCount"></span><button id="refreshClassesBtn" class="small-btn" type="button">重新整理</button></div>
+      </div>
+      <div id="classList"><div class="loading">載入中…</div></div>
     </div>
   </section>
 
@@ -199,6 +226,26 @@
     <label class="check-row"><input id="editStudentActive" type="checkbox"> 啟用帳號</label>
     <label>重設密碼（不重設可留空）<input id="editStudentPassword" type="password" placeholder="至少 4 碼"></label>
     <div class="dialog-actions"><button type="button" class="ghost" data-close="studentDialog">取消</button><button class="primary" type="submit">儲存</button></div>
+  </form>
+</dialog>
+
+<dialog id="classDialog" class="form-dialog">
+  <form id="classEditForm">
+    <div class="dialog-head"><div><small id="editClassCode"></small><h2>編輯班級</h2></div><button type="button" class="close-dialog" data-close="classDialog">×</button></div>
+    <label>班級名稱<input id="editClassName" maxlength="100" required></label>
+    <label class="check-row"><input id="editClassActive" type="checkbox"> 啟用此班級</label>
+    <label>班級管理頁帳號<input id="editClassGateUsername" maxlength="100" required></label>
+    <label>班級管理頁新密碼（不更改可留空）<input id="editClassGatePassword" type="password" maxlength="100" placeholder="至少 4 碼"></label>
+    <div class="account-divider"></div>
+    <p id="editClassAccountInfo" class="hint"></p>
+    <label>班管主登入新密碼（留空會重設為預設 4 碼）<input id="editClassAdminPassword" type="password" maxlength="64" placeholder="例如 0113"></label>
+    <div class="dialog-actions spread">
+      <div class="btnrow">
+        <button id="resetClassAdminPasswordBtn" type="button" class="small-btn">重設班管主登入密碼</button>
+        <button id="resetClassGateBtn" type="button" class="small-btn">管理頁帳密恢復預設</button>
+      </div>
+      <div><button type="button" class="ghost" data-close="classDialog">取消</button> <button class="primary" type="submit">儲存班級</button></div>
+    </div>
   </form>
 </dialog>
 
