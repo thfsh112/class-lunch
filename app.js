@@ -1,7 +1,7 @@
 const{createClient}=supabase;
 const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage,storageKey:'class-lunch-user-auth'}});
 const $=id=>document.getElementById(id);
-let student=null,sessions=[],orders=[],menuItems=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,realtimeChannel=null,realtimeTimer=null,realtimeRefreshMode='',studentViewClassId=null,loadedMenuTemplateKey='',deferredInstallPrompt=null,notificationPermissionStatus=null,pushPermissionSyncing=false;
+let student=null,sessions=[],orders=[],menuItems=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,realtimeChannel=null,realtimeTimer=null,realtimeRefreshMode='',studentViewClassId=null,loadedMenuTemplateKey='',deferredInstallPrompt=null,notificationPermissionStatus=null,pushPermissionSyncing=false,lastStudentRefreshStartedAt=0;
 const money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
 const PUSH_VAPID_PUBLIC_KEY='BIfooHITgKhbwNm9ufy7fUdoyaU46cxxSFFoAOPQrKHJ4RPHzsqYQb9CEMWflB4PlXmpyptPHWl-fvgiWjeW_kE';
 const PUSH_DEVICE_OPT_IN_KEY='class-lunch-push-device-opt-in-v1';
@@ -663,6 +663,7 @@ $('passwordForm').addEventListener('submit',async e=>{
 });
 
 async function refresh(){
+  lastStudentRefreshStartedAt=Date.now();
   const{data:{session}}=await db.auth.getSession();
   if(!session){
     stopStudentRealtime();
@@ -966,7 +967,7 @@ function stopStudentRealtime(){
   if(realtimeChannel){db.removeChannel(realtimeChannel);realtimeChannel=null}
 }
 setInterval(()=>{if(student&&sessions.length)renderSessions()},30000);
-db.auth.onAuthStateChange(()=>setTimeout(refresh,0));
+db.auth.onAuthStateChange(()=>setTimeout(()=>{if(Date.now()-lastStudentRefreshStartedAt>1500)refresh()},150));
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){stopStudentRealtime();return}
   if(student&&!$('studentApp')?.classList.contains('hidden')){
