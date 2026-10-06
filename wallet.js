@@ -3,6 +3,7 @@
   let walletEnabled=false;
   const isWalletEnabled=()=>walletEnabled&&typeof student!=='undefined'&&student?.seat_number!==undefined&&student?.seat_number!==null;
   let walletSnapshot=null;
+  let walletVisibilityPromise=null,walletVisibilityQueued=false;
 
   function injectUi(){
     if(!byId('walletBtn')){
@@ -101,7 +102,7 @@
     byId('walletTab-'+tab)?.classList.remove('hidden');
   }
 
-  async function refreshVisibility(){
+  async function doRefreshVisibility(){
     injectUi();
     walletEnabled=false;
     if(typeof student!=='undefined'&&student?.seat_number!==undefined&&student?.seat_number!==null){
@@ -118,6 +119,20 @@
       return;
     }
     if(byId('orderDialog')?.open)await refreshCheckout();
+  }
+
+  async function refreshVisibility(){
+    if(walletVisibilityPromise){
+      walletVisibilityQueued=true;
+      return walletVisibilityPromise;
+    }
+    walletVisibilityPromise=(async()=>{
+      do{
+        walletVisibilityQueued=false;
+        await doRefreshVisibility();
+      }while(walletVisibilityQueued);
+    })().finally(()=>{walletVisibilityPromise=null});
+    return walletVisibilityPromise;
   }
 
   async function fetchWallet(){
@@ -245,7 +260,7 @@
       const txs=txRes.data||[];
       byId('walletTxList').innerHTML=txs.length?txs.map(x=>`
         <article class="history-row">
-          <div class="history-main"><b>${txLabel(x.tx_type)}</b><small>${new Date(x.created_at).toLocaleString('zh-TW')}</small><small>${x.note||''}</small></div>
+          <div class="history-main"><b>${txLabel(x.tx_type)}</b><small>${new Date(x.created_at).toLocaleString('zh-TW')}</small><small>${esc(x.note||'')}</small></div>
           <strong class="history-price">${Number(x.amount)>0?'+':''}${money(x.amount).replace('$-','-$')}</strong>
         </article>`).join(''):'<div class="history-empty"><b>目前沒有交易紀錄</b></div>';
 
@@ -496,10 +511,8 @@
   window.addEventListener('class-lunch-student-ready',()=>refreshVisibility());
 
   db.auth.onAuthStateChange(()=>{
-    setTimeout(refreshVisibility,250);
-    setTimeout(refreshVisibility,900);
+    setTimeout(refreshVisibility,350);
   });
 
-  setTimeout(refreshVisibility,350);
-  setTimeout(refreshVisibility,1200);
+  setTimeout(refreshVisibility,500);
 })();
