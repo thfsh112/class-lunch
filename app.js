@@ -199,8 +199,14 @@ function countdown(s){
   if(mins<=30)return '剩餘 '+mins+'分 · 你還有機會';
   return '即將截止 · 剩餘 '+mins+'分';
 }
-function validSeat(seat){return Number.isInteger(seat)&&((seat>=1&&seat<=35)||seat===99)}
-function internalEmail(seat){return 'seat'+String(Number(seat)).padStart(2,'0')+'@class-lunch.example'}
+function validSeat(seat){return Number.isInteger(seat)&&seat>=1&&seat<=9999}
+function safeClassCode(v){return String(v||'').trim().toLowerCase().replace(/[^a-z0-9_-]/g,'')}
+function internalEmail(classCode,seat){
+  const n=Number(seat),code=String(classCode||'').trim();
+  if(n===99)return 'seat99@class-lunch.example';
+  if(code==='112'&&n>=1&&n<=35)return 'seat'+String(n).padStart(2,'0')+'@class-lunch.example';
+  return 'class'+safeClassCode(code)+'-seat'+String(n)+'@class-lunch.example';
+}
 function authPassword(raw){return 'CLP:'+String(raw)+':2026'}
 function urlBase64ToUint8Array(base64String){
   const padding='='.repeat((4-base64String.length%4)%4);
@@ -489,8 +495,9 @@ async function detachPushBeforeLogout(){
   await detachCurrentPushBinding();
 }
 async function openAccountDialog(){
+  stopStudentRealtime();
   $('passwordForm').reset();
-  const locked=student?.seat_number===99;
+  const locked=student?.role==='system_admin';
   const section=$('passwordChangeSection');
   if(section)section.classList.toggle('hidden',locked);
   const note=$('passwordLockedNote');
@@ -502,38 +509,59 @@ async function openAccountDialog(){
 
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();
-  const account=String($('seatLogin').value||'').trim().toLowerCase(),raw=$('passwordLogin').value;
+  const classCode=String($('classLogin').value||'').trim();
+  const account=String($('seatLogin').value||'').trim().toLowerCase();
+  const raw=$('passwordLogin').value;
+  if(!classCode)return toast('請輸入班級');
 
   if(account==='tch'){
-    const{data,error}=await db.functions.invoke('class-lunch-teacher-login',{body:{account:'tch',password:raw}});
-    if(error||data?.error)return toast('帳號或密碼錯誤');
+    const{data,error}=await db.functions.invoke('class-lunch-teacher-login',{body:{class_code:classCode,account:'tch',password:raw}});
+    if(error||data?.error)return toast('班級、帳號或密碼錯誤');
     if(!data?.access_token||!data?.refresh_token)return toast('老師登入失敗');
     const{error:setError}=await db.auth.setSession({access_token:data.access_token,refresh_token:data.refresh_token});
     if(setError)return toast('登入失敗：'+setError.message);
+    localStorage.setItem('class-lunch-last-class',classCode);
     $('passwordLogin').value='';return refresh();
   }
 
   const seat=Number(account);
-  if(!validSeat(seat))return toast('帳號不正確');
+  if(!validSeat(seat))return toast('座號不正確');
+
   if(seat===99){
     if(raw!=='099')return toast('座號或密碼錯誤');
-    const{error}=await db.auth.signInWithPassword({email:internalEmail(99),password:authPassword('099')});
-    if(error)return toast('座號或密碼錯誤');
-    $('passwordLogin').value='';
-    return refresh();
+    const{data:initData,error:initError}=await db.functions.invoke('class-lunch-init-login',{body:{class_code:classCode,seat_number:seat,initial_code:raw}});
+    if(initError||initData?.error)return toast('登入失敗：'+(initData?.detail||initData?.error||initError?.message||'未知錯誤'));
+    if(!initData?.access_token||!initData?.refresh_token)return toast('登入失敗');
+    const{error:setError}=await db.auth.setSession({access_token:initData.access_token,refresh_token:initData.refresh_token});
+    if(setError)return toast('登入失敗：'+setError.message);
+    localStorage.setItem('class-lunch-last-class',classCode);
+    $('passwordLogin').value='';return refresh();
   }
-  if(raw===String(seat).padStart(3,'0')){
-    const{data:initData,error:initError}=await db.functions.invoke('class-lunch-init-login',{body:{seat_number:seat,initial_code:raw}});
-    if(initError||initData?.error)return toast('初始登入失敗：'+(initData?.detail||initData?.error||initError?.message||'未知錯誤'));
-    if(initData?.access_token&&initData?.refresh_token){
-      const{error:setError}=await db.auth.setSession({access_token:initData.access_token,refresh_token:initData.refresh_token});
-      if(setError)return toast('登入失敗：'+setError.message);
-      $('passwordLogin').value='';return refresh();
+
+  let loginError=null;
+  const email=internalEmail(classCode,seat);
+  const direct=await db.auth.signInWithPassword({email,password:authPassword(raw)});
+  loginError=direct.error;
+
+  if(loginError){
+    const initial3=String(seat).padStart(3,'0');
+    const initial4=String(seat).padStart(4,'0');
+    if(raw===initial3||raw===initial4){
+      const{data:initData,error:initError}=await db.functions.invoke('class-lunch-init-login',{body:{class_code:classCode,seat_number:seat,initial_code:raw}});
+      if(!initError&&!initData?.error&&initData?.access_token&&initData?.refresh_token){
+        const{error:setError}=await db.auth.setSession({access_token:initData.access_token,refresh_token:initData.refresh_token});
+        if(setError)return toast('登入失敗：'+setError.message);
+        loginError=null;
+      }else{
+        return toast('班級、座號或密碼錯誤');
+      }
     }
   }
-  const{error}=await db.auth.signInWithPassword({email:internalEmail(seat),password:authPassword(raw)});
-  if(error)return toast('座號或密碼錯誤');
-  $('passwordLogin').value='';await refresh();
+
+  if(loginError)return toast('班級、座號或密碼錯誤');
+  localStorage.setItem('class-lunch-last-class',classCode);
+  $('passwordLogin').value='';
+  await refresh();
 });
 
 $('setupForm').addEventListener('submit',async e=>{
@@ -588,7 +616,7 @@ document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',
 
 $('passwordForm').addEventListener('submit',async e=>{
   e.preventDefault();
-  if(student?.seat_number===99)return toast('99 號密碼固定為 099，不能修改');
+  if(student?.role==='system_admin')return toast('99 號密碼固定為 099，不能修改');
   const p1=$('newPassword').value,p2=$('newPassword2').value;
   if(p1.length<4)return toast('密碼至少 4 碼');
   if(p1!==p2)return toast('兩次密碼不一致');
@@ -617,7 +645,7 @@ async function refresh(){
     return;
   }
 
-  const{data:s,error}=await db.from('students').select('id,seat_number,name,active,must_setup').eq('auth_user_id',user.id).maybeSingle();
+  const{data:s,error}=await db.from('students').select('id,seat_number,name,active,must_setup,role,class_id,classes(code,name)').eq('auth_user_id',user.id).maybeSingle();
   if(error){
     $('welcomeText').textContent='登入狀態仍保留，學生資料暫時讀取失敗。';
     return;
@@ -625,11 +653,13 @@ async function refresh(){
   if(!s||!s.active){await db.auth.signOut();student=null;toast('此學生帳號目前無法使用');return refresh()}
   student=s;
   window.dispatchEvent(new Event('class-lunch-student-ready'));
-  startStudentRealtime();watchNotificationPermission();$('loginBox').classList.add('hidden');$('heroAccount').classList.remove('hidden');$('logoutBtn').classList.remove('hidden');$('historyBtn').classList.remove('hidden');
-  $('adminLink').classList.toggle('hidden',s.seat_number!==99);
-  $('heroIdentity').textContent=s.seat_number+'號 '+(s.name||'');
+  watchNotificationPermission();$('loginBox').classList.add('hidden');$('heroAccount').classList.remove('hidden');$('logoutBtn').classList.remove('hidden');$('historyBtn').classList.remove('hidden');
+  const isManager=['system_admin','class_admin'].includes(String(s.role||''));
+  $('adminLink').classList.toggle('hidden',!isManager);
+  const classLabel=s.role==='system_admin'?'系統管理員 ':(s.classes?.code?s.classes.code+'班 ':'');
+  $('heroIdentity').textContent=classLabel+s.seat_number+'號 '+(s.name||'');
 
-  if(s.must_setup&&s.seat_number!==99){
+  if(s.must_setup&&!isManager){
     const isTeacher=s.seat_number===0;
     $('setupTitle').textContent=isTeacher?'老師第一次登入':'第一次登入設定';
     $('setupHint').textContent=isTeacher?'初始密碼必須更換後才能使用訂餐；老師名稱固定，不需要設定姓名。':'請先設定姓名並更換密碼。姓名完成設定後只能由管理員修改。';
@@ -639,6 +669,7 @@ async function refresh(){
     $('notifyBtn').classList.add('hidden');$('accountBtn').classList.add('hidden');$('historyBtn').classList.add('hidden');$('adminLink').classList.add('hidden');$('studentApp').classList.add('hidden');$('setupBox').classList.remove('hidden');$('welcomeText').textContent=isTeacher?'0號 老師 · 請先更換初始密碼':s.seat_number+'號第一次登入設定';return;
   }
   $('notifyBtn').classList.remove('hidden');$('accountBtn').classList.remove('hidden');$('setupBox').classList.add('hidden');$('studentApp').classList.remove('hidden');
+  startStudentRealtime();
   $('setupNameField').classList.remove('hidden');$('setupName').required=true;
   $('welcomeText').textContent='歡迎回來，'+(s.name||s.seat_number+'號')+'。看看今天想吃什麼。';
   setTimeout(()=>refreshPushStatus(),0);
@@ -809,6 +840,7 @@ async function cancelOrder(sessionId){
 }
 async function openHistory(){
   if(!student)return;
+  stopStudentRealtime();
   $('historyDialog').showModal();
   $('historyList').innerHTML='<div class="loading">載入手機快取…</div>';
 
@@ -842,10 +874,9 @@ function scheduleStudentRealtimeRefresh(){
   realtimeTimer=setTimeout(()=>{if(student)loadSessions()},350);
 }
 function startStudentRealtime(){
-  if(realtimeChannel)return;
+  if(realtimeChannel||!student||document.hidden||$('studentApp')?.classList.contains('hidden'))return;
   realtimeChannel=db.channel('class-lunch-student-realtime')
     .on('postgres_changes',{event:'*',schema:'public',table:'orders'},scheduleStudentRealtimeRefresh)
-    .on('postgres_changes',{event:'*',schema:'public',table:'order_items'},scheduleStudentRealtimeRefresh)
     .on('postgres_changes',{event:'*',schema:'public',table:'meal_sessions'},scheduleStudentRealtimeRefresh)
     .on('postgres_changes',{event:'*',schema:'public',table:'menu_items'},scheduleStudentRealtimeRefresh)
     .on('postgres_changes',{event:'*',schema:'public',table:'menu_templates'},scheduleStudentRealtimeRefresh)
@@ -857,6 +888,16 @@ function stopStudentRealtime(){
 }
 setInterval(()=>{if(student&&sessions.length)renderSessions()},30000);
 db.auth.onAuthStateChange(()=>setTimeout(refresh,0));
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){stopStudentRealtime();return}
+  if(student&&!$('studentApp')?.classList.contains('hidden')){
+    startStudentRealtime();
+    loadSessions().catch(()=>{});
+  }
+});
+$('historyDialog')?.addEventListener('close',()=>startStudentRealtime());
+$('accountDialog')?.addEventListener('close',()=>startStudentRealtime());
+if($('classLogin'))$('classLogin').value=localStorage.getItem('class-lunch-last-class')||'112';
 renderHomeEasterSubtitle();
 refreshInstallStatus();
 setTimeout(refreshInstallStatus,32000);
