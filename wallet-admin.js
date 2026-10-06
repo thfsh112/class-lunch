@@ -1,6 +1,11 @@
 (()=>{
   const byId=id=>document.getElementById(id);
 
+  function walletAdminReady(){
+    const app=byId('adminApp');
+    return !!adminGatePassed && !!selectedAdminClassId && !!app && !app.classList.contains('hidden');
+  }
+
   function txLabel(type){
     return ({
       topup:'儲值',
@@ -35,7 +40,7 @@
 
   async function loadWalletBalances(){
     const box=byId('walletBalancesList');
-    if(!box||!adminGatePassed)return;
+    if(!box||!walletAdminReady())return;
     box.innerHTML='<div class="loading">載入中…</div>';
     const {data,error}=await db.rpc('class_lunch_wallet_admin_overview');
     if(error){box.innerHTML='<div class="loading">讀取失敗</div>';return toast('讀取錢包餘額失敗：'+error.message)}
@@ -74,7 +79,7 @@
 
   async function loadWalletDebts(){
     const box=byId('walletDebtsList'),summary=byId('walletDebtSummary');
-    if(!box||!summary||!adminGatePassed)return;
+    if(!box||!summary||!walletAdminReady())return;
     box.innerHTML='<div class="loading">載入中…</div>';
     const {data,error}=await db.rpc('class_lunch_wallet_admin_debts');
     if(error){box.innerHTML='<div class="loading">讀取失敗</div>';return toast('讀取欠款金額失敗：'+error.message)}
@@ -98,7 +103,7 @@
   }
 
   async function loadWalletPendingCounts(){
-    if(!adminGatePassed)return;
+    if(!walletAdminReady())return;
     const {data,error}=await db.rpc('class_lunch_wallet_admin_pending_counts');
     if(error)return;
     const count=Number(data?.topups||0);
@@ -112,7 +117,7 @@
 
   async function loadWalletTopups(){
     const box=byId('walletTopupsList');
-    if(!box||!adminGatePassed)return;
+    if(!box||!walletAdminReady())return;
     box.innerHTML='<div class="loading">載入中…</div>';
     const {data,error}=await db.rpc('class_lunch_wallet_admin_topup_requests',{p_limit:200});
     if(error){box.innerHTML='<div class="loading">讀取失敗</div>';return toast('讀取加值申請失敗：'+error.message)}
@@ -153,7 +158,7 @@
 
   async function loadWalletSettlements(){
     const box=byId('walletSettlementsList');
-    if(!box||!adminGatePassed)return;
+    if(!box||!walletAdminReady())return;
     box.innerHTML='<div class="loading">載入中…</div>';
     const {data,error}=await db.rpc('class_lunch_wallet_admin_settlement_requests',{p_limit:200});
     if(error){box.innerHTML='<div class="loading">讀取失敗</div>';return toast('讀取結清資料失敗：'+error.message)}
@@ -198,7 +203,7 @@
 
   async function loadWalletLedger(){
     const box=byId('walletLedgerList');
-    if(!box||!adminGatePassed)return;
+    if(!box||!walletAdminReady())return;
     box.innerHTML='<div class="loading">載入中…</div>';
     const {data,error}=await db.rpc('class_lunch_wallet_admin_transactions',{p_limit:300});
     if(error){box.innerHTML='<div class="loading">讀取失敗</div>';return toast('讀取金錢流水失敗：'+error.message)}
@@ -286,7 +291,7 @@
   window.loadWalletDebts=loadWalletDebts;
 
   setTimeout(()=>{
-    if(adminGatePassed){
+    if(walletAdminReady()){
       loadWalletBalances().catch(()=>{});
       loadWalletDebts().catch(()=>{});
       loadWalletTopups().catch(()=>{});
@@ -298,6 +303,6 @@
 
   // Tiny count-only refresh while admin is open; avoids pulling the full topup list.
   setInterval(()=>{
-    if(adminGatePassed)loadWalletPendingCounts().catch(()=>{});
+    if(walletAdminReady())loadWalletPendingCounts().catch(()=>{});
   },60000);
 })();
