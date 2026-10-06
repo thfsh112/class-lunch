@@ -47,7 +47,7 @@ async function hasActiveAdminGate(){
     selectedAdminClassCode='';
     selectedAdminClassName='';
     localStorage.removeItem('class-lunch-admin-gate');
-    sessionStorage.removeItem('class-lunch-admin-class-selected');
+    localStorage.removeItem('class-lunch-admin-class-selected');
     return false;
   }
   selectedAdminClassId=String(data?.class_id||'');
@@ -80,7 +80,7 @@ $('loginForm').addEventListener('submit',async e=>{
   selectedAdminClassId=String(data?.class_id||'');
   selectedAdminClassCode=String(data?.class_code||'');
   if(currentAdminRole==='system_admin'){
-    sessionStorage.removeItem('class-lunch-admin-class-selected');
+    localStorage.removeItem('class-lunch-admin-class-selected');
     await showAdminClassPicker(true);
   }else{
     await refresh();
@@ -90,7 +90,7 @@ $('logoutBtn')?.addEventListener('click',async()=>{
   try{await db.functions.invoke('class-lunch-admin-login',{body:{action:'logout'}})}catch{}
   adminGatePassed=false;
   localStorage.removeItem('class-lunch-admin-gate');
-  sessionStorage.removeItem('class-lunch-admin-class-selected');
+  localStorage.removeItem('class-lunch-admin-class-selected');
   await db.auth.signOut({scope:'local'});
   refresh();
 });
@@ -170,14 +170,14 @@ $('adminClassPickerForm')?.addEventListener('submit',async e=>{
     selectedAdminClassName=String(data.class_name||'');
     const selectedMeta=classes.find(x=>String(x.code)===selectedAdminClassCode);
     selectedAdminStudentCapacity=Number(selectedMeta?.student_capacity||0);
-    sessionStorage.setItem('class-lunch-admin-class-selected','1');
+    localStorage.setItem('class-lunch-admin-class-selected','1');
     await enterSelectedAdminClass();
   }finally{
     if(btn){btn.disabled=false;btn.textContent='進入班級管理';}
   }
 });
 $('switchAdminClassBtn')?.addEventListener('click',()=>{
-  sessionStorage.removeItem('class-lunch-admin-class-selected');
+  localStorage.removeItem('class-lunch-admin-class-selected');
   showAdminClassPicker(false);
 });
 
@@ -247,7 +247,7 @@ async function refresh(){
   const adminIdentity=await isAdmin();
   const gateActive=adminIdentity?await hasActiveAdminGate():false;
   const ok=adminIdentity&&gateActive;
-  const pickerNeeded=ok&&currentAdminRole==='system_admin'&&sessionStorage.getItem('class-lunch-admin-class-selected')!=='1';
+  const pickerNeeded=ok&&currentAdminRole==='system_admin'&&localStorage.getItem('class-lunch-admin-class-selected')!=='1';
   $('loginBox').classList.toggle('hidden',ok);
   $('adminClassPickerBox')?.classList.toggle('hidden',!pickerNeeded);
   $('adminApp').classList.toggle('hidden',!ok||pickerNeeded);
