@@ -516,9 +516,9 @@ $('loginForm').addEventListener('submit',async e=>{
   const classCode=String($('classLogin').value||'').trim();
   const account=String($('seatLogin').value||'').trim().toLowerCase();
   const raw=$('passwordLogin').value;
-  if(!classCode)return toast('請輸入班級');
 
   if(account==='tch'){
+    if(!classCode)return toast('請輸入班級');
     const{data,error}=await db.functions.invoke('class-lunch-teacher-login',{body:{class_code:classCode,account:'tch',password:raw}});
     if(error||data?.error)return toast('班級、帳號或密碼錯誤');
     if(!data?.access_token||!data?.refresh_token)return toast('老師登入失敗');
@@ -533,14 +533,18 @@ $('loginForm').addEventListener('submit',async e=>{
 
   if(seat===99){
     if(raw!=='099')return toast('座號或密碼錯誤');
-    const{data:initData,error:initError}=await db.functions.invoke('class-lunch-init-login',{body:{class_code:classCode,seat_number:seat,initial_code:raw}});
-    if(initError||initData?.error)return toast('登入失敗：'+(initData?.detail||initData?.error||initError?.message||'未知錯誤'));
-    if(!initData?.access_token||!initData?.refresh_token)return toast('登入失敗');
+    const remembered=String(localStorage.getItem('class-lunch-last-class')||'').trim();
+    const contextClass=classCode||remembered||'112';
+    const{data:initData,error:initError}=await db.functions.invoke('class-lunch-init-login',{body:{class_code:contextClass,seat_number:seat,initial_code:raw}});
+    if(initError||initData?.error)return toast('99 登入失敗，請確認密碼或重新整理後再試');
+    if(!initData?.access_token||!initData?.refresh_token)return toast('99 登入失敗');
     const{error:setError}=await db.auth.setSession({access_token:initData.access_token,refresh_token:initData.refresh_token});
-    if(setError)return toast('登入失敗：'+setError.message);
-    localStorage.setItem('class-lunch-last-class',classCode);
+    if(setError)return toast('99 登入失敗，請重新整理後再試');
+    localStorage.setItem('class-lunch-last-class',contextClass);
     $('passwordLogin').value='';return refresh();
   }
+
+  if(!classCode)return toast('請輸入班級');
 
   let loginError=null;
   const email=internalEmail(classCode,seat);
