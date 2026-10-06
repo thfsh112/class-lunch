@@ -1401,9 +1401,9 @@ async function loadOverview(){
   const list=os||[],paid=list.filter(o=>o.paid).length,total=list.reduce((a,o)=>a+Number(o.unit_price||0)*Number(o.quantity||1),0);
   $('statOrders').textContent=list.length;$('statPaid').textContent=paid;$('statUnpaidCount').textContent=list.length-paid;
 
-  const itemCounts=new Map(),normalizedOrders=new Set(),marketByOrder=new Map(),unresolvedOrders=new Set(),orderIds=list.map(o=>o.id);
+  const itemCounts=new Map(),variantCounts=new Map(),optionCounts=new Map(),normalizedOrders=new Set(),marketByOrder=new Map(),unresolvedOrders=new Set(),orderIds=list.map(o=>o.id);
   if(orderIds.length){
-    const{data:oi,error:oie}=await db.from('order_items').select('id,order_id,quantity,unit_price,is_market_price,market_price_amount,menu_items(name,is_market_price)').in('order_id',orderIds);
+    const{data:oi,error:oie}=await db.from('order_items').select('id,order_id,quantity,unit_price,is_market_price,market_price_amount,variant_name,option_summary,configuration,item_name_snapshot,menu_items(name,is_market_price)').in('order_id',orderIds);
     if(oie)return toast('讀取品項統計失敗：'+oie.message);
     for(const row of (oi||[])){
       const name=row.menu_items?.name;
@@ -1416,7 +1416,22 @@ async function loadOverview(){
         marketByOrder.get(row.order_id).push(row);
         if(row.market_price_amount==null)unresolvedOrders.add(row.order_id);
       }
-      itemCounts.set(displayName,(itemCounts.get(displayName)||0)+Number(row.quantity||1));
+      const qty=Number(row.quantity||1);
+      itemCounts.set(displayName,(itemCounts.get(displayName)||0)+qty);
+
+      if(row.variant_name){
+        const key=name+'｜'+row.variant_name;
+        variantCounts.set(key,(variantCounts.get(key)||0)+qty);
+      }
+      const configOptions=Array.isArray(row.configuration?.options)?row.configuration.options:[];
+      for(const opt of configOptions){
+        const groupName=String(opt?.group_name||'加購').trim()||'加購';
+        const optionName=String(opt?.option_name||'').trim();
+        if(!optionName)continue;
+        if(!optionCounts.has(groupName))optionCounts.set(groupName,new Map());
+        const gm=optionCounts.get(groupName);
+        gm.set(optionName,(gm.get(optionName)||0)+qty);
+      }
     }
   }
   for(const o of list){
@@ -1432,7 +1447,15 @@ async function loadOverview(){
   }
   $('statTotal').textContent=money(total)+(unresolvedOrders.size?' ＋ 時價':'');
   const itemRows=[...itemCounts.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'zh-Hant'));
+  const variantRows=[...variantCounts.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'zh-Hant'));
+  const optionSections=[...optionCounts.entries()]
+    .map(([group,counts])=>[group,[...counts.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'zh-Hant'))])
+    .sort((a,b)=>a[0].localeCompare(b[0],'zh-Hant'));
   const totalQty=itemRows.reduce((a,x)=>a+x[1],0);
+  const comboCopyLines=[
+    ...(variantRows.length?['────────','【點餐方式】',...variantRows.map(([name,qty])=>name+'：'+qty+'份')]:[]),
+    ...optionSections.flatMap(([group,rows])=>rows.length?['────────','【'+group+'】',...rows.map(([name,qty])=>name+'：'+qty+'份')]:[])
+  ];
   const noteRows=list
     .map(o=>{
       const note=String(o.note||'').trim();
@@ -1461,6 +1484,7 @@ async function loadOverview(){
   latestOverviewCopyText=[
     '【'+sessionLabel+' 訂餐統計】',
     ...(itemRows.length?itemRows.map(([name,qty])=>name+'：'+qty+'份'):['目前沒有品項']),
+    ...comboCopyLines,
     ...(noteRows.length?[
       '────────',
       '【備註】',
@@ -1472,8 +1496,12 @@ async function loadOverview(){
     '已付款：'+paid+'人｜未付款：'+(list.length-paid)+'人',
     '總金額：'+money(total)+(unresolvedOrders.size?' ＋ 時價':'')
   ].join('\n');
+  const comboStatsHtml=
+    (variantRows.length?'<div class="combo-stats-section"><h3>點餐方式</h3><div class="item-stats-table">'+variantRows.map(([name,qty])=>'<div class="item-stat-row"><span>'+esc(name)+'</span><b>'+qty+' 份</b></div>').join('')+'</div></div>':'')+
+    optionSections.map(([group,rows])=>'<div class="combo-stats-section"><h3>'+esc(group)+'</h3><div class="item-stats-table">'+rows.map(([name,qty])=>'<div class="item-stat-row"><span>'+esc(name)+'</span><b>'+qty+' 份</b></div>').join('')+'</div></div>').join('');
   $('itemStats').innerHTML='<div class="item-stats-head"><h3>品項統計</h3><div class="btnrow"><span>'+totalQty+' 份</span><button class="small-btn" type="button" onclick="copyOverviewStats()">一鍵複製 LINE</button></div></div>'+
     (itemRows.length?'<div class="item-stats-table">'+itemRows.map(([name,qty])=>'<div class="item-stat-row"><span>'+esc(name)+(name.includes('（時價）')?' <em class="market-badge">時價</em>':'')+'</span><b>'+qty+' 份</b></div>').join('')+'</div>':'<div class="loading">目前沒有品項</div>')+
+    comboStatsHtml+
     (noteRows.length?'<div class="order-notes-summary"><h3>備註</h3>'+noteRows.map(x=>'<div class="item-stat-row"><span><b>'+esc(x.seat+'號'+(x.name?' '+x.name:''))+'</b><br><small>'+esc(x.item)+'</small></span><strong>'+esc(x.note)+'</strong></div>').join('')+'</div>':'');
 
   const bySeat=new Map();for(const o of list){const st=students.find(s=>s.id===o.student_id),seat=st?.seat_number??Number(o.student_name);if(Number.isInteger(Number(seat)))bySeat.set(Number(seat),{...o,name:st?.name||''})}
