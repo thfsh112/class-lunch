@@ -1,7 +1,7 @@
 const{createClient}=supabase;
 const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage,storageKey:'class-lunch-user-auth'}});
 const $=id=>document.getElementById(id);
-let student=null,sessions=[],orders=[],menuItems=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,realtimeChannel=null,realtimeTimer=null,realtimeRefreshMode='',studentViewClassId=null,loadedMenuTemplateKey='',deferredInstallPrompt=null,notificationPermissionStatus=null,pushPermissionSyncing=false,lastStudentRefreshStartedAt=0;
+let student=null,sessions=[],orders=[],menuItems=[],menuVariants=[],menuOptionGroups=[],menuOptionChoices=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,realtimeChannel=null,realtimeTimer=null,realtimeRefreshMode='',studentViewClassId=null,loadedMenuTemplateKey='',deferredInstallPrompt=null,notificationPermissionStatus=null,pushPermissionSyncing=false,lastStudentRefreshStartedAt=0;
 const money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
 const PUSH_VAPID_PUBLIC_KEY='BIfooHITgKhbwNm9ufy7fUdoyaU46cxxSFFoAOPQrKHJ4RPHzsqYQb9CEMWflB4PlXmpyptPHWl-fvgiWjeW_kE';
 const PUSH_DEVICE_OPT_IN_KEY='class-lunch-push-device-opt-in-v1';
@@ -735,7 +735,7 @@ async function loadOrderState(){
   const orderIds=orders.map(o=>o.id);
   if(!orderIds.length)return;
   const{data:oi,error:oie}=await db.from('order_items')
-    .select('order_id,menu_item_id,quantity,unit_price,is_market_price,market_price_amount')
+    .select('id,order_id,menu_item_id,quantity,unit_price,is_market_price,market_price_amount,variant_id,variant_name,option_summary,configuration,item_name_snapshot')
     .in('order_id',orderIds)
     .order('id');
   if(oie)throw oie;
@@ -748,7 +748,7 @@ async function loadMenuState(force=false){
   const templateIds=[...new Set(sessions.map(s=>s.menu_template_id))].sort((a,b)=>Number(a)-Number(b));
   const key=templateIds.join(',');
   if(!templateIds.length){
-    menuItems=[];loadedMenuTemplateKey='';return;
+    menuItems=[];menuVariants=[];menuOptionGroups=[];menuOptionChoices=[];loadedMenuTemplateKey='';return;
   }
   if(!force&&key===loadedMenuTemplateKey&&menuItems.length)return;
   const{data:mi,error:me}=await db.from('menu_items')
@@ -759,6 +759,30 @@ async function loadMenuState(force=false){
     .order('id');
   if(me)throw me;
   menuItems=mi||[];
+  const itemIds=menuItems.map(x=>x.id);
+  if(!itemIds.length){
+    menuVariants=[];menuOptionGroups=[];menuOptionChoices=[];loadedMenuTemplateKey=key;return;
+  }
+  const [vr,gr]=await Promise.all([
+    db.from('menu_item_variants')
+      .select('id,menu_item_id,name,price_delta,is_default,active,sort_order')
+      .in('menu_item_id',itemIds).eq('active',true).order('sort_order').order('id'),
+    db.from('menu_option_groups')
+      .select('id,menu_item_id,variant_id,name,min_select,max_select,active,sort_order')
+      .in('menu_item_id',itemIds).eq('active',true).order('sort_order').order('id')
+  ]);
+  if(vr.error)throw vr.error;
+  if(gr.error)throw gr.error;
+  menuVariants=vr.data||[];
+  menuOptionGroups=gr.data||[];
+  const groupIds=menuOptionGroups.map(x=>x.id);
+  if(groupIds.length){
+    const cr=await db.from('menu_option_choices')
+      .select('id,group_id,name,price_delta,is_default,active,sort_order')
+      .in('group_id',groupIds).eq('active',true).order('sort_order').order('id');
+    if(cr.error)throw cr.error;
+    menuOptionChoices=cr.data||[];
+  }else menuOptionChoices=[];
   loadedMenuTemplateKey=key;
 }
 async function refreshOwnOrders(){
@@ -825,25 +849,201 @@ function getTestItemsForSession(){
   const s=sessions.find(x=>x.id===editingSessionId);
   return s?menuItems.filter(x=>x.menu_template_id===s.menu_template_id&&x.active!==false):[];
 }
+function variantsForItem(itemId){
+  return menuVariants.filter(x=>Number(x.menu_item_id)===Number(itemId)&&x.active!==false)
+    .sort((a,b)=>Number(a.sort_order)-Number(b.sort_order)||Number(a.id)-Number(b.id));
+}
+function groupsForSelection(sel){
+  if(!sel?.menu_item_id)return [];
+  return menuOptionGroups.filter(g=>
+    Number(g.menu_item_id)===Number(sel.menu_item_id)&&
+    g.active!==false&&
+    (g.variant_id==null||Number(g.variant_id)===Number(sel.variant_id))
+  ).sort((a,b)=>Number(a.sort_order)-Number(b.sort_order)||Number(a.id)-Number(b.id));
+}
+function choicesForGroup(groupId){
+  return menuOptionChoices.filter(x=>Number(x.group_id)===Number(groupId)&&x.active!==false)
+    .sort((a,b)=>Number(a.sort_order)-Number(b.sort_order)||Number(a.id)-Number(b.id));
+}
+function newConfiguredSelection(itemId=''){
+  const id=Number(itemId)||null;
+  if(!id)return {menu_item_id:null,variant_id:null,option_ids:[]};
+  const variants=variantsForItem(id);
+  const preferred=variants.find(x=>x.is_default)||variants[0]||null;
+  return {menu_item_id:id,variant_id:preferred?.id||null,option_ids:[]};
+}
+function sanitizeConfiguredSelection(sel){
+  if(!sel?.menu_item_id)return newConfiguredSelection();
+  const item=getTestItemsForSession().find(x=>Number(x.id)===Number(sel.menu_item_id));
+  if(!item)return newConfiguredSelection();
+  const variants=variantsForItem(item.id);
+  let variantId=sel.variant_id==null?null:Number(sel.variant_id);
+  if(variants.length&&!variants.some(v=>Number(v.id)===variantId)){
+    variantId=(variants.find(v=>v.is_default)||variants[0])?.id||null;
+  }
+  if(!variants.length)variantId=null;
+  const next={menu_item_id:Number(item.id),variant_id:variantId,option_ids:(sel.option_ids||[]).map(Number).filter(Number.isFinite)};
+  const allowedGroups=groupsForSelection(next);
+  const allowedChoices=new Set(allowedGroups.flatMap(g=>choicesForGroup(g.id).map(x=>Number(x.id))));
+  next.option_ids=[...new Set(next.option_ids.filter(id=>allowedChoices.has(Number(id))))];
+  return next;
+}
+function configDeltaLabel(n){
+  const v=Number(n||0);
+  return v===0?'':v>0?' ＋'+money(v):' −'+money(Math.abs(v));
+}
+function configuredSelectionQuote(raw){
+  const sel=sanitizeConfiguredSelection(raw);
+  const item=getTestItemsForSession().find(x=>Number(x.id)===Number(sel.menu_item_id));
+  if(!item)return {amount:0,unresolvedMarket:false,error:'請選擇餐點'};
+  const variants=variantsForItem(item.id);
+  const variant=variants.find(v=>Number(v.id)===Number(sel.variant_id))||null;
+  if(variants.length&&!variant)return {amount:0,unresolvedMarket:!!item.is_market_price,error:item.name+'：請選擇點餐方式'};
+  let amount=item.is_market_price?0:Number(item.price||0);
+  amount+=Number(variant?.price_delta||0);
+  const groups=groupsForSelection(sel);
+  for(const g of groups){
+    const allowed=choicesForGroup(g.id);
+    const allowedIds=new Set(allowed.map(x=>Number(x.id)));
+    const selected=(sel.option_ids||[]).filter(id=>allowedIds.has(Number(id)));
+    if(selected.length<Number(g.min_select||0)||selected.length>Number(g.max_select||1)){
+      const need=Number(g.min_select)===Number(g.max_select)
+        ?'必須選 '+Number(g.min_select)+' 個'
+        :'需選 '+Number(g.min_select)+'～'+Number(g.max_select)+' 個';
+      return {amount,unresolvedMarket:!!item.is_market_price,error:item.name+'：'+g.name+' '+need};
+    }
+    amount+=selected.reduce((sum,id)=>sum+Number(allowed.find(x=>Number(x.id)===Number(id))?.price_delta||0),0);
+  }
+  return {amount,unresolvedMarket:!!item.is_market_price,error:''};
+}
+function currentConfiguredQuote(){
+  let amount=0,unresolvedMarket=false,error='';
+  for(const raw of testSelections.filter(x=>x?.menu_item_id)){
+    const q=configuredSelectionQuote(raw);
+    amount+=Number(q.amount||0);
+    unresolvedMarket=unresolvedMarket||q.unresolvedMarket;
+    if(!error&&q.error)error=q.error;
+  }
+  return {amount,unresolvedMarket,error};
+}
+function buildStructuredOrderPayload(validate=true){
+  const rows=testSelections.filter(x=>x?.menu_item_id).map(sanitizeConfiguredSelection);
+  if(!rows.length){if(validate)throw new Error('至少選一個品項');return []}
+  if(validate){
+    for(const row of rows){
+      const q=configuredSelectionQuote(row);
+      if(q.error)throw new Error(q.error);
+    }
+  }
+  const grouped=new Map();
+  for(const row of rows){
+    const normalized={menu_item_id:Number(row.menu_item_id),variant_id:row.variant_id==null?null:Number(row.variant_id),option_ids:[...(row.option_ids||[])].map(Number).sort((a,b)=>a-b)};
+    const key=JSON.stringify(normalized);
+    const old=grouped.get(key);
+    if(old)old.qty+=1;
+    else grouped.set(key,{...normalized,qty:1});
+  }
+  return [...grouped.values()];
+}
+function itemSelectOptions(items,selected){
+  const groups=new Map();
+  for(const item of items){
+    const cat=String(item.category||'其他').trim()||'其他';
+    if(!groups.has(cat))groups.set(cat,[]);
+    groups.get(cat).push(item);
+  }
+  let html='<option value="">請選擇餐點</option>';
+  for(const [cat,rows] of groups){
+    html+='<optgroup label="'+esc(cat)+'">'+rows.map(x=>
+      '<option value="'+x.id+'" '+(Number(x.id)===Number(selected)?'selected':'')+'>'+
+      esc(x.name+'　'+(x.is_market_price?'時價':money(x.price)))+
+      '</option>'
+    ).join('')+'</optgroup>';
+  }
+  return html;
+}
+function renderConfiguredControls(sel,i){
+  if(!sel?.menu_item_id)return '';
+  const item=getTestItemsForSession().find(x=>Number(x.id)===Number(sel.menu_item_id));
+  if(!item)return '';
+  const variants=variantsForItem(item.id);
+  let html='';
+  if(variants.length){
+    html+='<label class="combo-field"><span>點餐方式</span><select onchange="updateTestOrderVariant('+i+',this.value)">'+
+      variants.map(v=>'<option value="'+v.id+'" '+(Number(v.id)===Number(sel.variant_id)?'selected':'')+'>'+esc(v.name+configDeltaLabel(v.price_delta))+'</option>').join('')+
+      '</select></label>';
+  }
+  for(const g of groupsForSelection(sel)){
+    const choices=choicesForGroup(g.id);
+    const selected=new Set((sel.option_ids||[]).map(Number));
+    const req=Number(g.min_select||0)>0?'必選':'選填';
+    const limit=Number(g.max_select||1)>1?' · 最多 '+g.max_select+' 個':'';
+    if(Number(g.max_select||1)===1){
+      html+='<label class="combo-field"><span>'+esc(g.name)+' <small>'+req+limit+'</small></span><select onchange="updateTestOrderSingleOption('+i+','+g.id+',this.value)">'+
+        '<option value="">請選擇</option>'+
+        choices.map(ch=>'<option value="'+ch.id+'" '+(selected.has(Number(ch.id))?'selected':'')+'>'+esc(ch.name+configDeltaLabel(ch.price_delta))+'</option>').join('')+
+        '</select></label>';
+    }else{
+      html+='<div class="combo-field"><span>'+esc(g.name)+' <small>'+req+limit+'</small></span><div class="combo-choice-grid">'+
+        choices.map(ch=>'<label class="combo-choice"><input type="checkbox" '+(selected.has(Number(ch.id))?'checked':'')+' onchange="toggleTestOrderOption('+i+','+g.id+','+ch.id+',this.checked)"> '+esc(ch.name+configDeltaLabel(ch.price_delta))+'</label>').join('')+
+        '</div></div>';
+    }
+  }
+  return html;
+}
 function renderTestOrderRows(){
   const items=getTestItemsForSession();
-  if(!testSelections.length)testSelections=[''];
-  while(testSelections.length>1&&testSelections.at(-1)===''&&testSelections.at(-2)==='')testSelections.pop();
-  if(testSelections.at(-1)!==''&&testSelections.length<20)testSelections.push('');
+  if(!testSelections.length)testSelections=[newConfiguredSelection()];
+  testSelections=testSelections.map(sanitizeConfiguredSelection);
+  while(testSelections.length>1&&!testSelections.at(-1)?.menu_item_id&&!testSelections.at(-2)?.menu_item_id)testSelections.pop();
+  if(testSelections.at(-1)?.menu_item_id&&testSelections.length<20)testSelections.push(newConfiguredSelection());
 
-  $('testOrderRows').innerHTML=testSelections.map((v,i)=>{
-    const opts='<option value="">請選擇餐點</option>'+items.map(x=>'<option value="'+x.id+'" '+(String(x.id)===String(v)?'selected':'')+'>'+esc(x.name+'　'+(x.is_market_price?'時價':money(x.price)))+'</option>').join('');
-    const removable=v!==''?'<button type="button" class="small-btn danger" onclick="removeTestOrderSelection('+i+')">移除</button>':'';
-    return '<div class="test-order-row"><select onchange="updateTestOrderSelection('+i+',this.value)">'+opts+'</select>'+removable+'</div>';
+  $('testOrderRows').innerHTML=testSelections.map((sel,i)=>{
+    const removable=sel?.menu_item_id?'<button type="button" class="small-btn danger" onclick="removeTestOrderSelection('+i+')">移除</button>':'';
+    const quote=sel?.menu_item_id?configuredSelectionQuote(sel):null;
+    return '<div class="test-order-row combo-order-row">'+
+      '<div class="combo-order-main"><select onchange="updateTestOrderItem('+i+',this.value)">'+itemSelectOptions(items,sel?.menu_item_id)+'</select>'+
+      renderConfiguredControls(sel,i)+
+      (sel?.menu_item_id?'<div class="combo-line-price">'+(quote?.error?'<span class="combo-error">'+esc(quote.error)+'</span>':'<span>'+money(quote.amount)+(quote.unresolvedMarket?' ＋ 時價':'')+'</span>')+'</div>':'')+
+      '</div>'+removable+'</div>';
   }).join('');
 
-  const chosen=testSelections.filter(Boolean).map(id=>items.find(m=>String(m.id)===String(id))).filter(Boolean);
-  const total=chosen.reduce((sum,x)=>sum+(x.is_market_price?0:Number(x.price||0)),0);
-  const hasMarket=chosen.some(x=>x.is_market_price);
-  $('selectedItemPrice').textContent=money(total)+(hasMarket?' ＋ 時價':'');
+  const quote=currentConfiguredQuote();
+  $('selectedItemPrice').textContent=money(quote.amount)+(quote.unresolvedMarket?' ＋ 時價':'');
 }
-function updateTestOrderSelection(i,value){
-  testSelections[i]=value;
+function updateTestOrderItem(i,value){
+  testSelections[i]=newConfiguredSelection(value);
+  renderTestOrderRows();
+}
+function updateTestOrderVariant(i,value){
+  const current=sanitizeConfiguredSelection(testSelections[i]);
+  current.variant_id=value?Number(value):null;
+  current.option_ids=[];
+  testSelections[i]=sanitizeConfiguredSelection(current);
+  renderTestOrderRows();
+}
+function updateTestOrderSingleOption(i,groupId,value){
+  const current=sanitizeConfiguredSelection(testSelections[i]);
+  const groupChoiceIds=new Set(choicesForGroup(groupId).map(x=>Number(x.id)));
+  current.option_ids=(current.option_ids||[]).filter(id=>!groupChoiceIds.has(Number(id)));
+  if(value)current.option_ids.push(Number(value));
+  testSelections[i]=current;
+  renderTestOrderRows();
+}
+function toggleTestOrderOption(i,groupId,choiceId,checked){
+  const current=sanitizeConfiguredSelection(testSelections[i]);
+  const group=menuOptionGroups.find(g=>Number(g.id)===Number(groupId));
+  let ids=new Set((current.option_ids||[]).map(Number));
+  if(checked){
+    const inGroup=[...ids].filter(id=>choicesForGroup(groupId).some(x=>Number(x.id)===id));
+    if(inGroup.length>=Number(group?.max_select||1)){
+      toast('「'+(group?.name||'此選項')+'」最多選 '+Number(group?.max_select||1)+' 個');
+      return renderTestOrderRows();
+    }
+    ids.add(Number(choiceId));
+  }else ids.delete(Number(choiceId));
+  current.option_ids=[...ids];
+  testSelections[i]=current;
   renderTestOrderRows();
 }
 function removeTestOrderSelection(i){
@@ -862,12 +1062,18 @@ async function openOrderEditor(sessionId){
     testSelections=[];
     if(existing.length){
       for(const row of existing){
-        for(let q=0;q<Number(row.quantity||1);q++)testSelections.push(String(row.menu_item_id));
+        const cfg=row.configuration||{};
+        const base={
+          menu_item_id:Number(row.menu_item_id),
+          variant_id:row.variant_id??cfg.variant_id??null,
+          option_ids:Array.isArray(cfg.option_ids)?cfg.option_ids.map(Number):[]
+        };
+        for(let q=0;q<Number(row.quantity||1);q++)testSelections.push({...base,option_ids:[...base.option_ids]});
       }
     }else if(o?.menu_item_id){
-      testSelections=[String(o.menu_item_id)];
+      testSelections=[newConfiguredSelection(o.menu_item_id)];
     }
-    testSelections.push('');
+    testSelections.push(newConfiguredSelection());
     renderTestOrderRows();
   }else{
     $('orderItem').value=o?.item_name||'';$('orderAmount').value=o?.unit_price??'';
@@ -881,13 +1087,10 @@ $('orderDialogForm').addEventListener('submit',async e=>{
   let error=null;
   const hasStructuredItems=getTestItemsForSession().length>0;
   if(hasStructuredItems){
-    const counts=new Map();
-    for(const raw of testSelections.filter(Boolean)){
-      const id=Number(raw);counts.set(id,(counts.get(id)||0)+1);
-    }
-    if(!counts.size){b.disabled=false;b.textContent='儲存訂單';return toast('至少選一個品項')}
-    const items=[...counts.entries()].map(([menu_item_id,qty])=>({menu_item_id,qty}));
-    const r=await db.rpc('place_class_lunch_order_v6',{p_session_id:editingSessionId,p_items:items,p_note:note,p_payment_method:'onsite'});error=r.error;
+    let items;
+    try{items=buildStructuredOrderPayload(true)}
+    catch(err){b.disabled=false;b.textContent='儲存訂單';return toast(err.message)}
+    const r=await db.rpc('place_class_lunch_order_v7',{p_session_id:editingSessionId,p_items:items,p_note:note,p_payment_method:'onsite'});error=r.error;
   }else{
     const item=$('orderItem').value.trim(),amountRaw=$('orderAmount').value.trim(),amount=Number(amountRaw);
     if(!item){b.disabled=false;b.textContent='儲存訂單';return toast('請輸入品項')}
@@ -960,6 +1163,9 @@ function startStudentRealtime(){
     },()=>scheduleStudentRealtimeRefresh('full'))
     .on('postgres_changes',{event:'*',schema:'public',table:'menu_items'},()=>scheduleStudentRealtimeRefresh('full'))
     .on('postgres_changes',{event:'*',schema:'public',table:'menu_templates'},()=>scheduleStudentRealtimeRefresh('full'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'menu_item_variants'},()=>scheduleStudentRealtimeRefresh('full'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'menu_option_groups'},()=>scheduleStudentRealtimeRefresh('full'))
+    .on('postgres_changes',{event:'*',schema:'public',table:'menu_option_choices'},()=>scheduleStudentRealtimeRefresh('full'))
     .subscribe();
 }
 function stopStudentRealtime(){
