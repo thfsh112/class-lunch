@@ -695,3 +695,63 @@
   .pretty-select-option{min-height:50px;padding-top:10px;padding-bottom:10px}
   .pretty-select-section-title{padding-top:9px}
 }
+
+/* Scrollable order editor with checkout controls always reachable */
+#orderDialog{
+  max-height:min(94dvh,900px);
+  overflow:hidden;
+}
+#orderDialogForm{
+  display:flex;
+  flex-direction:column;
+  max-height:min(94dvh,900px);
+  padding:0;
+  overflow:hidden;
+}
+#orderDialogForm>.dialog-head{
+  flex:0 0 auto;
+  padding:20px 20px 12px;
+  background:#fff;
+  border-bottom:1px solid #f0e4de;
+  z-index:4;
+}
+.order-dialog-scroll{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:visible;
+  padding:8px 20px 18px;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;
+}
+#orderDialogForm>.dialog-actions{
+  flex:0 0 auto;
+  position:relative;
+  z-index:5;
+  margin:0;
+  padding:12px 20px max(12px,env(safe-area-inset-bottom));
+  border-top:1px solid #eadbd4;
+  background:linear-gradient(180deg,#fffdfb 0%,#fff 58%);
+  box-shadow:0 -8px 20px #8d6e5d12;
+}
+#orderDialogForm>.dialog-actions .primary{
+  min-width:120px;
+}
+@media(max-width:720px){
+  #orderDialog{
+    max-height:calc(100dvh - 12px);
+  }
+  #orderDialogForm{
+    max-height:calc(100dvh - 12px);
+  }
+  #orderDialogForm>.dialog-head{
+    padding:16px 16px 10px;
+  }
+  .order-dialog-scroll{
+    padding:7px 14px 18px;
+  }
+  #orderDialogForm>.dialog-actions{
+    padding:11px 14px max(11px,env(safe-area-inset-bottom));
+  }
+}
