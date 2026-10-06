@@ -153,6 +153,10 @@ async function refresh(){
   if(!ok){stopAdminRealtime();return}
   const classesTab=$('classesTabBtn');
   if(classesTab)classesTab.classList.toggle('hidden',currentAdminRole!=='system_admin');
+  const managementTabs=document.querySelector('[data-admin-subgroup="management"]');
+  if(managementTabs)managementTabs.style.gridTemplateColumns=currentAdminRole==='system_admin'
+    ?'repeat(5,minmax(0,1fr))'
+    :'repeat(4,minmax(0,1fr))';
   if(currentAdminRole!=='system_admin'&&!$('tab-classes')?.classList.contains('hidden'))await openAdminTab('students');
   startAdminRealtime();
   $('sessionDate').value=today();
