@@ -1,7 +1,7 @@
 const{createClient}=supabase;
 const db=createClient(APP_CONFIG.supabaseUrl,APP_CONFIG.publishableKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage,storageKey:'class-lunch-user-auth'}});
 const $=id=>document.getElementById(id);
-let student=null,sessions=[],orders=[],menuItems=[],menuVariants=[],menuOptionGroups=[],menuOptionChoices=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,realtimeChannel=null,realtimeTimer=null,realtimeRefreshMode='',studentViewClassId=null,loadedMenuTemplateKey='',deferredInstallPrompt=null,notificationPermissionStatus=null,pushPermissionSyncing=false,lastStudentRefreshStartedAt=0;
+let student=null,sessions=[],orders=[],menuItems=[],menuVariants=[],menuOptionGroups=[],menuOptionChoices=[],orderItemsByOrder={},testSelections=[],editingSessionId=null,backupOrderFlow=null,realtimeChannel=null,realtimeTimer=null,realtimeRefreshMode='',studentViewClassId=null,loadedMenuTemplateKey='',deferredInstallPrompt=null,notificationPermissionStatus=null,pushPermissionSyncing=false,lastStudentRefreshStartedAt=0;
 const money=n=>'$'+Number(n||0).toLocaleString('zh-TW');
 const PUSH_VAPID_PUBLIC_KEY='BIfooHITgKhbwNm9ufy7fUdoyaU46cxxSFFoAOPQrKHJ4RPHzsqYQb9CEMWflB4PlXmpyptPHWl-fvgiWjeW_kE';
 const PUSH_DEVICE_OPT_IN_KEY='class-lunch-push-device-opt-in-v1';
@@ -166,21 +166,23 @@ async function syncHistoryDelta(){
 }
 function renderHistoryList(list){
   const rows=list||[];
-  const total=rows.reduce((sum,o)=>sum+Number(o.unit_price||0),0);
-  const paid=rows.filter(o=>o.paid).length;
-  const hasMarket=rows.some(o=>o.unresolved_market);
+  const financialRows=rows.filter(o=>!['cancelled_backup','cancelled_restaurant','pending_choice'].includes(o.order_status));
+  const total=financialRows.reduce((sum,o)=>sum+Number(o.unit_price||0),0);
+  const paid=financialRows.filter(o=>o.paid).length;
+  const unpaid=financialRows.filter(o=>!o.paid).length;
+  const hasMarket=financialRows.some(o=>o.unresolved_market);
   const loyaltyBadges=loyaltyStreakBadges(rows);
   $('historyCount').textContent=rows.length;
   $('historyTotal').textContent=money(total)+(hasMarket?' ＋ 時價':'');
   $('historyPaid').textContent=paid;
-  $('historyUnpaid').textContent=rows.length-paid;
+  $('historyUnpaid').textContent=unpaid;
   $('historyList').innerHTML=rows.length?rows.map((o,i)=>{
     const date=o.meal_date||o.order_date||'';
     const shop=o.menu_name||'歷史訂單';
     const streak=loyaltyBadges.get(i);
     return '<article class="history-row">'+
       '<div class="history-date">'+esc(date?fmtDate(date):'—')+'</div>'+
-      '<div class="history-main"><div class="history-title"><b>'+esc(shop)+'</b><span class="'+(o.paid?'history-paid':'history-unpaid')+'">'+(o.paid?'已付款':'未付款')+'</span>'+(streak?'<span class="loyalty-badge">忠誠顧客 ×'+streak+'</span>':'')+'</div>'+
+      '<div class="history-main"><div class="history-title"><b>'+esc(shop)+'</b><span class="'+(o.paid?'history-paid':'history-unpaid')+'">'+(o.order_status==='cancelled_restaurant'?'餐廳未接單・已取消':o.order_status==='cancelled_backup'?'備用未採用':o.order_status==='pending_choice'?'等待採用':o.paid?'已付款':'未付款')+'</span>'+(streak?'<span class="loyalty-badge">忠誠顧客 ×'+streak+'</span>':'')+'</div>'+
       '<div class="history-items">'+esc(o.item_name||'未記錄品項')+'</div>'+
       (o.note?'<small>備註：'+esc(o.note)+'</small>':'')+
       '<small class="easter-note">'+esc(paymentEaster(!!o.paid,o.unit_price))+'</small></div>'+
@@ -726,7 +728,7 @@ async function loadOrderState(){
   if(!student||!sessions.length)return;
   const sessionIds=sessions.map(s=>s.id);
   const{data:os,error:oe}=await db.from('orders')
-    .select('id,meal_session_id,item_name,unit_price,note,paid,payment_method,onsite_received,created_at,menu_item_id')
+    .select('id,meal_session_id,item_name,unit_price,note,paid,payment_method,onsite_received,created_at,menu_item_id,order_status')
     .eq('student_id',student.id)
     .in('meal_session_id',sessionIds)
     .order('created_at',{ascending:false});
@@ -798,7 +800,7 @@ async function refreshOwnOrders(){
 async function loadSessions(options={}){
   const forceMenus=options?.forceMenus===true;
   let q=db.from('meal_sessions')
-    .select('id,meal_date,cutoff_at,is_active,class_id,menu_template_id,menu_templates(id,name,image_url,active)')
+    .select('id,meal_date,cutoff_at,is_active,class_id,menu_template_id,backup_group_id,backup_slot,restaurant_status,menu_template_id,menu_templates(id,name,image_url,active),meal_session_groups(id,status,selected_session_id,meal_date)')
     .eq('is_active',true)
     .gte('meal_date',today());
   if(studentViewClassId)q=q.eq('class_id',studentViewClassId);
@@ -817,16 +819,57 @@ async function loadSessions(options={}){
   renderSessionPicker();
   renderSessions();
 }
+function pickerRootSessions(){
+  const seen=new Set(),roots=[];
+  for(const s of sessions.slice().sort((a,b)=>a.meal_date.localeCompare(b.meal_date)||String(a.backup_slot||'').localeCompare(String(b.backup_slot||''))||Number(a.id)-Number(b.id))){
+    const key=s.backup_group_id?'g:'+s.backup_group_id:'s:'+s.id;
+    if(seen.has(key))continue;
+    seen.add(key);roots.push(s);
+  }
+  return roots;
+}
 function renderSessionPicker(){
-  const sel=$('sessionPicker'),previous=Number(sel.value);
-  sel.innerHTML=sessions.map(s=>'<option value="'+s.id+'">'+esc(fmtDate(s.meal_date)+'｜'+(s.menu_templates?.name||'菜單'))+'</option>').join('');
-  if(previous&&sessions.some(s=>s.id===previous))sel.value=String(previous);else if(sessions.length)sel.value=String(sessions[0].id);
-  sel.disabled=sessions.length===0;sel.onchange=renderSessions;
+  const sel=$('sessionPicker'),previous=Number(sel.value),roots=pickerRootSessions();
+  sel.innerHTML=roots.map(s=>{
+    const grouped=!!s.backup_group_id;
+    const label=fmtDate(s.meal_date)+'｜'+(grouped?'A/B 備用訂餐':(s.menu_templates?.name||'菜單'));
+    return '<option value="'+s.id+'">'+esc(label)+'</option>';
+  }).join('');
+  if(previous&&roots.some(s=>s.id===previous))sel.value=String(previous);else if(roots.length)sel.value=String(roots[0].id);
+  sel.disabled=roots.length===0;sel.onchange=renderSessions;
+}
+function orderStateMarkup(o,label){
+  if(!o)return '<div class="order-status empty"><b>'+esc(label)+' 尚未完成</b></div>';
+  if(o.order_status==='cancelled_restaurant')return '<div class="order-status empty"><b>'+esc(label)+' 餐廳未接單・已取消</b><div>'+esc(o.item_name||'')+' · '+money(o.unit_price)+'</div></div>';
+  if(o.order_status==='cancelled_backup')return '<div class="order-status empty"><b>'+esc(label)+' 備用未採用</b><div>'+esc(o.item_name||'')+' · '+money(o.unit_price)+'</div></div>';
+  const pending=o.order_status==='pending_choice';
+  return '<div class="order-status '+(o.paid?'paid':'pending')+'"><b>'+esc(label)+' '+(o.paid?'✓ 已付款':pending?'✓ 已完成選餐':'已訂餐 · 未付款')+'</b><div>'+esc(o.item_name||'')+' · '+money(o.unit_price)+'</div></div>';
 }
 function renderSessions(){
   if(!sessions.length){$('menus').innerHTML='<div class="loading lunch-empty-egg"><b>今天暫時沒有便當可以支配你的人生。</b><span>有開放訂餐時會出現在這裡。</span></div>';return}
-  const selectedId=Number($('sessionPicker')?.value)||sessions[0].id;
-  const s=sessions.find(x=>x.id===selectedId)||sessions[0],o=orders.find(x=>x.meal_session_id===s.id),closed=expired(s);
+  const roots=pickerRootSessions();
+  const selectedId=Number($('sessionPicker')?.value)||roots[0]?.id||sessions[0].id;
+  const s=sessions.find(x=>x.id===selectedId)||roots[0]||sessions[0];
+
+  if(s.backup_group_id){
+    const groupSessions=sessions.filter(x=>Number(x.backup_group_id)===Number(s.backup_group_id))
+      .sort((a,b)=>String(a.backup_slot||'').localeCompare(String(b.backup_slot||''))||Number(a.id)-Number(b.id));
+    const group=s.meal_session_groups||{};
+    const closed=groupSessions.every(expired);
+    const statusText=({collecting:'請依序完成兩份菜單，最後選付款方式；目前不會扣款。',awaiting_restaurant:'管理員已選擇菜單，正在等待餐廳確認。',confirmed:'餐廳已接單，正式訂單已成立。',cancelled:'本次餐廳皆未接單，訂餐已取消。'})[group.status]||'';
+    const cards=groupSessions.map(x=>{
+      const o=orders.find(v=>Number(v.meal_session_id)===Number(x.id));
+      const img=x.menu_templates?.image_url?'<div class="photo-button" data-image-url="'+esc(x.menu_templates.image_url)+'"><img class="menu-photo" src="'+esc(x.menu_templates.image_url)+'" alt="菜單"></div>':'';
+      return '<div class="history-pack-order"><span><b>'+esc((x.backup_slot||'?')+'｜'+(x.menu_templates?.name||'菜單'))+'</b><small>'+esc(x.restaurant_status==='failed'?'餐廳未接單':x.restaurant_status==='not_selected'?'備用未採用':x.restaurant_status==='confirmed'?'餐廳已接單':'備用候選')+'</small></span></div>'+img+orderStateMarkup(o,x.backup_slot||'');
+    }).join('');
+    const canOrder=group.status==='collecting'&&!closed;
+    const payMethod=groupSessions.map(x=>orders.find(o=>Number(o.meal_session_id)===Number(x.id))).find(Boolean)?.payment_method;
+    const action=canOrder?'<button class="primary full-btn" onclick="startBackupOrderFlow('+s.backup_group_id+')">'+(groupSessions.every(x=>orders.some(o=>Number(o.meal_session_id)===Number(x.id)&&o.order_status==='pending_choice'))?'修改 A / B 選餐':'開始 A → B 點餐')+'</button>':'';
+    $('menus').innerHTML='<article class="menu-card"><div class="menu-body"><h3>A / B 複選備用</h3><div class="menu-meta">📅 '+esc(fmtDate(s.meal_date))+'</div><div class="order-status pending"><b>'+esc(statusText)+'</b>'+(payMethod&&group.status==='collecting'?'<small>目前付款方式：'+(payMethod==='wallet'?'錢包':'現場付款')+'（採用菜單確認後才結算）</small>':'')+'</div>'+cards+action+'</div></article>';
+    return;
+  }
+
+  const o=orders.find(x=>x.meal_session_id===s.id),closed=expired(s);
   const img=s.menu_templates?.image_url?'<div class="photo-button" data-image-url="'+esc(s.menu_templates.image_url)+'"><img class="menu-photo" src="'+esc(s.menu_templates.image_url)+'" alt="菜單"></div>':'<div class="menu-photo placeholder">🍱</div>';
   let state='';
   if(o){
@@ -834,9 +877,13 @@ function renderSessions(){
     const knownMarket=rows.some(x=>x.is_market_price);
     const unresolvedMarket=rows.some(x=>x.is_market_price&&x.market_price_amount==null)||(!knownMarket&&String(o.item_name||'').includes('（時價）'));
     const hasOnsiteMoney=Number(o.onsite_received||0)!==0;
-    state='<div class="order-status '+(o.paid?'paid':'pending')+'"><b>'+(o.paid?'✓ 已付款':'已訂餐 · 未付款')+'</b><div>'+esc(o.item_name)+' · '+money(o.unit_price)+(unresolvedMarket?' ＋ 時價':'')+'</div><small>'+esc(o.note||'無備註')+'</small>'+(hasOnsiteMoney&&!o.paid?'<small>此訂單已有現場收款紀錄，請由管理員處理後續。</small>':'')+'<small class="easter-note">'+esc(paymentEaster(!!o.paid,o.unit_price))+'</small></div>';
-    if(!closed&&!o.paid&&!hasOnsiteMoney)state+='<div class="order-actions"><button class="primary" onclick="openOrderEditor('+s.id+')">修改訂單</button><button class="small-btn danger" onclick="cancelOrder('+s.id+')">取消訂單</button></div>';
-    else if(!closed&&o.paid&&o.payment_method==='wallet')state+='<div class="order-actions"><button class="small-btn danger" onclick="cancelOrder('+s.id+')">取消訂單並退回錢包</button></div>';
+    if(o.order_status==='cancelled_restaurant'){
+      state='<div class="order-status empty"><b>餐廳未接單・本次已取消</b><div>'+esc(o.item_name||'')+' · '+money(o.unit_price)+'</div><small>這筆不會列入欠款；原錢包扣款如有發生會留下退款紀錄。</small></div>';
+    }else{
+      state='<div class="order-status '+(o.paid?'paid':'pending')+'"><b>'+(o.paid?'✓ 已付款':'已訂餐 · 未付款')+'</b><div>'+esc(o.item_name)+' · '+money(o.unit_price)+(unresolvedMarket?' ＋ 時價':'')+'</div><small>'+esc(o.note||'無備註')+'</small>'+(hasOnsiteMoney&&!o.paid?'<small>此訂單已有現場收款紀錄，請由管理員處理後續。</small>':'')+'<small class="easter-note">'+esc(paymentEaster(!!o.paid,o.unit_price))+'</small></div>';
+      if(!closed&&!o.paid&&!hasOnsiteMoney)state+='<div class="order-actions"><button class="primary" onclick="openOrderEditor('+s.id+')">修改訂單</button><button class="small-btn danger" onclick="cancelOrder('+s.id+')">取消訂單</button></div>';
+      else if(!closed&&o.paid&&o.payment_method==='wallet')state+='<div class="order-actions"><button class="small-btn danger" onclick="cancelOrder('+s.id+')">取消訂單並退回錢包</button></div>';
+    }
   }else if(closed){
     state='<div class="closed-order">詠丞小弟弟告訴你：<br>便當不點，錢全花在她身上，<br>她說永遠，最後還不是散場。<br>愛情會跑，雞腿不會說謊，<br>與其餓著等她，不如先讓自己吃爽。<br>可惜這次訂餐已經收場，<br>下次早點來，別再對著空胃惆悵。</div>';
   }else{
@@ -844,6 +891,73 @@ function renderSessions(){
   }
   const deadline='<div class="deadline '+(closed?'closed':'')+'"><span>截止：'+esc(fmtCutoff(s.cutoff_at)||'未設定')+'</span><b>'+esc(countdown(s))+'</b></div>';
   $('menus').innerHTML='<article class="menu-card">'+img+'<div class="menu-body"><h3>'+esc(s.menu_templates?.name||'菜單')+'</h3><div class="menu-meta">📅 '+esc(fmtDate(s.meal_date))+'</div>'+deadline+state+'</div></article>';
+}
+function classLunchBackupFlowActive(){return !!backupOrderFlow}
+window.classLunchBackupFlowActive=classLunchBackupFlowActive;
+async function startBackupOrderFlow(groupId){
+  if(!(await ensureLatestVersionBeforeOrdering()))return;
+  const steps=sessions.filter(s=>Number(s.backup_group_id)===Number(groupId)&&s.restaurant_status!=='failed')
+    .sort((a,b)=>String(a.backup_slot||'').localeCompare(String(b.backup_slot||''))||Number(a.id)-Number(b.id));
+  if(!steps.length)return toast('目前沒有可用的備用菜單');
+  const group=steps[0].meal_session_groups||{};
+  if(group.status!=='collecting')return toast('管理員已開始跟餐廳確認，現在不能修改');
+  backupOrderFlow={groupId:Number(groupId),steps,index:0};
+  await openOrderEditor(steps[0].id);
+}
+window.startBackupOrderFlow=startBackupOrderFlow;
+async function advanceBackupOrderFlow(){
+  if(!backupOrderFlow)return;
+  backupOrderFlow.index++;
+  if(backupOrderFlow.index<backupOrderFlow.steps.length){
+    const next=backupOrderFlow.steps[backupOrderFlow.index];
+    toast('A 已完成，接著點 '+(next.backup_slot||'B')+' 菜單');
+    await openOrderEditor(next.id);
+    return;
+  }
+  const groupId=backupOrderFlow.groupId;
+  backupOrderFlow=null;
+  await showBackupPaymentDialog(groupId);
+}
+function ensureBackupPaymentDialog(){
+  let dialog=$('backupPaymentDialog');
+  if(dialog)return dialog;
+  dialog=document.createElement('dialog');
+  dialog.id='backupPaymentDialog';dialog.className='form-dialog';
+  dialog.innerHTML='<form id="backupPaymentForm"><div class="dialog-head"><div><small>最後一步</small><h2>A / B 付款方式</h2></div><button type="button" class="close-dialog" data-close="backupPaymentDialog">×</button></div><p class="hint">現在只記錄付款方式，不會扣款。管理員確認餐廳接單後，只會按最後採用的菜單金額結算。</p><div id="backupWalletHint" class="hint"></div><label class="check-row"><input type="radio" name="backupPaymentMethod" value="wallet"> 錢包</label><label class="check-row"><input type="radio" name="backupPaymentMethod" value="onsite" checked> 現場付款</label><div class="dialog-actions"><button type="button" class="ghost" data-close="backupPaymentDialog">取消</button><button class="primary" type="submit">完成訂餐</button></div></form>';
+  document.body.appendChild(dialog);
+  dialog.querySelectorAll('[data-close="backupPaymentDialog"]').forEach(b=>b.addEventListener('click',()=>dialog.close()));
+  $('backupPaymentForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const groupId=Number(dialog.dataset.groupId),method=e.currentTarget.querySelector('input[name="backupPaymentMethod"]:checked')?.value||'onsite';
+    const btn=e.currentTarget.querySelector('button[type="submit"]');btn.disabled=true;btn.textContent='儲存中…';
+    try{
+      const{error}=await db.rpc('class_lunch_set_backup_payment_method',{p_group_id:groupId,p_payment_method:method});
+      if(error)throw error;
+      dialog.close();toast('A / B 都完成了，等待管理員確認採用菜單');
+      await refreshOwnOrders();
+      window.refreshWalletVisibility?.().catch?.(()=>{});
+    }catch(error){toast('付款方式儲存失敗：'+error.message)}
+    finally{btn.disabled=false;btn.textContent='完成訂餐'}
+  });
+  return dialog;
+}
+async function showBackupPaymentDialog(groupId){
+  await refreshOwnOrders();
+  const dialog=ensureBackupPaymentDialog();
+  dialog.dataset.groupId=String(groupId);
+  const walletRadio=dialog.querySelector('input[value="wallet"]'),onsite=dialog.querySelector('input[value="onsite"]');
+  walletRadio.disabled=true;onsite.checked=true;
+  $('backupWalletHint').textContent='正在讀取錢包狀態…';
+  try{
+    const{data,error}=await db.rpc('class_lunch_wallet_me');
+    if(error||!data)throw error||new Error('wallet unavailable');
+    const usable=data.status==='active'&&Number(data.balance)>0;
+    walletRadio.disabled=!usable;
+    $('backupWalletHint').textContent=usable?'目前錢包餘額：'+money(data.balance)+'；實際扣款會等管理員確認餐廳接單後才發生。':'目前錢包不可使用，請選現場付款。';
+  }catch{
+    $('backupWalletHint').textContent='目前沒有可用錢包，請選現場付款。';
+  }
+  dialog.showModal();
 }
 function getTestItemsForSession(){
   const s=sessions.find(x=>x.id===editingSessionId);
@@ -1201,7 +1315,13 @@ $('orderDialogForm').addEventListener('submit',async e=>{
   }
   b.disabled=false;b.textContent='儲存訂單';
   if(error)return toast('送出失敗：'+error.message);
-  $('orderDialog').close();toast('訂單已儲存');await refreshOwnOrders();
+  $('orderDialog').close();
+  if(backupOrderFlow){
+    await refreshOwnOrders();
+    await advanceBackupOrderFlow();
+  }else{
+    toast('訂單已儲存');await refreshOwnOrders();
+  }
 });
 async function cancelOrder(sessionId){
   if(!confirm('確定取消這筆訂單？'))return;
