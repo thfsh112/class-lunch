@@ -70,7 +70,15 @@
   </section>
 
   <section id="tab-sessions" class="tab-page hidden">
-    <div class="panel"><h2>新增訂餐日期</h2><form id="sessionForm" class="admin-form-grid"><label>菜單<select id="sessionTemplate" required></select></label><label>供餐日期<input id="sessionDate" type="date" required></label><label>截止時間<input id="sessionCutoff" type="datetime-local"><small class="hint">預設為供餐日當天 10:00，可自行調整。</small></label><label class="check-row"><input id="sessionActive" type="checkbox" checked> 開放</label><button class="primary" type="submit">新增日期</button></form></div>
+    <div class="panel"><h2>新增訂餐日期</h2><form id="sessionForm" class="admin-form-grid">
+      <label>訂餐模式<select id="sessionMode"><option value="single">單一菜單</option><option value="backup">複選備用 A / B</option></select></label>
+      <label>A 菜單<select id="sessionTemplate" required></select></label>
+      <label id="sessionBackupTemplateLabel" class="hidden">B 備用菜單<select id="sessionBackupTemplate"></select><small class="hint">學生會依序完成 A、B，最後只選一次付款方式。</small></label>
+      <label>供餐日期<input id="sessionDate" type="date" required></label>
+      <label>截止時間<input id="sessionCutoff" type="datetime-local"><small class="hint">預設為供餐日當天 10:00，可自行調整。</small></label>
+      <label class="check-row"><input id="sessionActive" type="checkbox" checked> 開放</label>
+      <button class="primary" type="submit">新增日期</button>
+    </form></div>
     <div class="panel"><div class="section-head"><h2>日期列表</h2><span id="sessionCount"></span></div><div id="sessionList"></div></div>
   </section>
 
