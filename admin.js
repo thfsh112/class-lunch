@@ -1492,9 +1492,18 @@ $('refreshUnpaidBtn')?.addEventListener('click',loadUnpaidOrders);
 async function loadOverview(){
   const id=Number($('overviewSession').value);if(!id)return;
   const s=sessions.find(x=>x.id===id),legacy=s?.legacy_menu_id||-1;
-  const{data:os,error}=await db.from('orders').select('id,student_id,student_name,item_name,unit_price,note,paid,quantity,payment_method,onsite_received,onsite_balance_due,paid_at').or('meal_session_id.eq.'+id+',menu_id.eq.'+legacy);
+  const{data:os,error}=await db.from('orders').select('id,student_id,student_name,item_name,unit_price,note,paid,quantity,payment_method,onsite_received,onsite_balance_due,paid_at,order_status,backup_checkout_ready').or('meal_session_id.eq.'+id+',menu_id.eq.'+legacy);
   if(error)return toast(error.message);
-  const list=os||[],paid=list.filter(o=>o.paid).length,total=list.reduce((a,o)=>a+Number(o.unit_price||0)*Number(o.quantity||1),0);
+  const rawList=os||[];
+  const list=rawList.filter(o=>o.order_status==='active'||(o.order_status==='pending_choice'&&o.backup_checkout_ready));
+  const paid=list.filter(o=>o.paid).length,total=list.reduce((a,o)=>a+Number(o.unit_price||0)*Number(o.quantity||1),0);
+  const isBackup=!!s?.backup_group_id;
+  const paidLabel=$('statPaid')?.parentElement?.querySelector('small');
+  const unpaidLabel=$('statUnpaidCount')?.parentElement?.querySelector('small');
+  const totalLabel=$('statTotal')?.parentElement?.querySelector('small');
+  if(paidLabel)paidLabel.textContent=isBackup?'已結算':'已付款';
+  if(unpaidLabel)unpaidLabel.textContent=isBackup?'待確認':'未付款';
+  if(totalLabel)totalLabel.textContent=isBackup?'預估金額':'總金額';
   $('statOrders').textContent=list.length;$('statPaid').textContent=paid;$('statUnpaidCount').textContent=list.length-paid;
 
   const itemCounts=new Map(),variantCounts=new Map(),optionCounts=new Map(),normalizedOrders=new Set(),marketByOrder=new Map(),unresolvedOrders=new Set(),orderIds=list.map(o=>o.id);
