@@ -185,7 +185,7 @@ function renderHistoryList(list){
       '<div class="history-main"><div class="history-title"><b>'+esc(shop)+'</b><span class="'+(o.paid?'history-paid':'history-unpaid')+'">'+(o.order_status==='cancelled_restaurant'?'餐廳未接單・已取消':o.order_status==='cancelled_backup'?'備用未採用':o.order_status==='pending_choice'?'等待採用':o.paid?'已付款':'未付款')+'</span>'+(streak?'<span class="loyalty-badge">忠誠顧客 ×'+streak+'</span>':'')+'</div>'+
       '<div class="history-items">'+esc(o.item_name||'未記錄品項')+'</div>'+
       (o.note?'<small>備註：'+esc(o.note)+'</small>':'')+
-      '<small class="easter-note">'+esc(paymentEaster(!!o.paid,o.unit_price))+'</small></div>'+
+      (!['cancelled_backup','cancelled_restaurant','pending_choice'].includes(o.order_status)?'<small class="easter-note">'+esc(paymentEaster(!!o.paid,o.unit_price))+'</small>':'')+'</div>'+
       '<strong class="history-price">'+money(o.unit_price)+(o.unresolved_market?' ＋ 時價':'')+'</strong>'+
     '</article>';
   }).join(''):'<div class="history-empty"><b>還沒有歷史訂單</b><span>完成第一次訂餐後會出現在這裡。</span></div>';
@@ -728,7 +728,7 @@ async function loadOrderState(){
   if(!student||!sessions.length)return;
   const sessionIds=sessions.map(s=>s.id);
   const{data:os,error:oe}=await db.from('orders')
-    .select('id,meal_session_id,item_name,unit_price,note,paid,payment_method,onsite_received,created_at,menu_item_id,order_status')
+    .select('id,meal_session_id,item_name,unit_price,note,paid,payment_method,onsite_received,created_at,menu_item_id,order_status,backup_checkout_ready')
     .eq('student_id',student.id)
     .in('meal_session_id',sessionIds)
     .order('created_at',{ascending:false});
@@ -800,7 +800,7 @@ async function refreshOwnOrders(){
 async function loadSessions(options={}){
   const forceMenus=options?.forceMenus===true;
   let q=db.from('meal_sessions')
-    .select('id,meal_date,cutoff_at,is_active,class_id,menu_template_id,backup_group_id,backup_slot,restaurant_status,menu_template_id,menu_templates(id,name,image_url,active),meal_session_groups(id,status,selected_session_id,meal_date)')
+    .select('id,meal_date,cutoff_at,is_active,class_id,menu_template_id,backup_group_id,backup_slot,restaurant_status,menu_templates(id,name,image_url,active),meal_session_groups(id,status,selected_session_id,meal_date)')
     .eq('is_active',true)
     .gte('meal_date',today());
   if(studentViewClassId)q=q.eq('class_id',studentViewClassId);
@@ -863,8 +863,9 @@ function renderSessions(){
       return '<div class="history-pack-order"><span><b>'+esc((x.backup_slot||'?')+'｜'+(x.menu_templates?.name||'菜單'))+'</b><small>'+esc(x.restaurant_status==='failed'?'餐廳未接單':x.restaurant_status==='not_selected'?'備用未採用':x.restaurant_status==='confirmed'?'餐廳已接單':'備用候選')+'</small></span></div>'+img+orderStateMarkup(o,x.backup_slot||'');
     }).join('');
     const canOrder=group.status==='collecting'&&!closed;
-    const payMethod=groupSessions.map(x=>orders.find(o=>Number(o.meal_session_id)===Number(x.id))).find(Boolean)?.payment_method;
-    const action=canOrder?'<button class="primary full-btn" onclick="startBackupOrderFlow('+s.backup_group_id+')">'+(groupSessions.every(x=>orders.some(o=>Number(o.meal_session_id)===Number(x.id)&&o.order_status==='pending_choice'))?'修改 A / B 選餐':'開始 A → B 點餐')+'</button>':'';
+    const readyOrder=groupSessions.map(x=>orders.find(o=>Number(o.meal_session_id)===Number(x.id)&&o.backup_checkout_ready)).find(Boolean);
+    const payMethod=readyOrder?.payment_method;
+    const action=canOrder?'<button class="primary full-btn" onclick="startBackupOrderFlow('+s.backup_group_id+')">'+(groupSessions.every(x=>orders.some(o=>Number(o.meal_session_id)===Number(x.id)&&o.order_status==='pending_choice'&&o.backup_checkout_ready))?'修改 A / B 選餐':'開始 A → B 點餐')+'</button>':'';
     $('menus').innerHTML='<article class="menu-card"><div class="menu-body"><h3>A / B 複選備用</h3><div class="menu-meta">📅 '+esc(fmtDate(s.meal_date))+'</div><div class="order-status pending"><b>'+esc(statusText)+'</b>'+(payMethod&&group.status==='collecting'?'<small>目前付款方式：'+(payMethod==='wallet'?'錢包':'現場付款')+'（採用菜單確認後才結算）</small>':'')+'</div>'+cards+action+'</div></article>';
     return;
   }
