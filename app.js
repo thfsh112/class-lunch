@@ -800,7 +800,7 @@ async function refreshOwnOrders(){
 async function loadSessions(options={}){
   const forceMenus=options?.forceMenus===true;
   let q=db.from('meal_sessions')
-    .select('id,meal_date,cutoff_at,is_active,class_id,menu_template_id,backup_group_id,backup_slot,restaurant_status,menu_templates(id,name,image_url,active),meal_session_groups(id,status,selected_session_id,meal_date)')
+    .select('id,meal_date,cutoff_at,is_active,class_id,menu_template_id,backup_group_id,backup_slot,restaurant_status,menu_templates(id,name,image_url,active),meal_session_groups!meal_sessions_backup_group_id_fkey(id,status,selected_session_id,meal_date)')
     .eq('is_active',true)
     .gte('meal_date',today());
   if(studentViewClassId)q=q.eq('class_id',studentViewClassId);
