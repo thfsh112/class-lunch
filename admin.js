@@ -283,7 +283,7 @@ async function loadTemplates(){
   templates=data||[];$('templateCount').textContent=templates.length+' 份';renderTemplateList();
 }
 async function loadSessions(){
-  let q=db.from('meal_sessions').select('*,menu_templates(name,image_url),meal_session_groups(id,status,selected_session_id,meal_date)');
+  let q=db.from('meal_sessions').select('*,menu_templates(name,image_url),meal_session_groups!meal_sessions_backup_group_id_fkey(id,status,selected_session_id,meal_date)');
   q=scopeAdminClass(q);
   const{data,error}=await q.order('meal_date',{ascending:false}).order('created_at',{ascending:false});
   if(error)return toast(error.message);
