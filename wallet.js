@@ -179,6 +179,10 @@
   async function refreshCheckout(){
     const box=byId('walletPaymentBox');
     if(!box||!isWalletEnabled())return;
+    if(window.classLunchBackupFlowActive?.()){
+      box.classList.add('hidden');
+      return;
+    }
     box.classList.remove('hidden');
     try{
       const w=await fetchWallet();
@@ -441,6 +445,7 @@
 
   async function handleWalletCheckout(e){
     if(!isWalletEnabled())return;
+    if(window.classLunchBackupFlowActive?.())return;
     e.preventDefault();
     e.stopImmediatePropagation();
     if(!editingSessionId)return;
