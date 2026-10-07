@@ -283,7 +283,7 @@ async function loadTemplates(){
   templates=data||[];$('templateCount').textContent=templates.length+' 份';renderTemplateList();
 }
 async function loadSessions(){
-  let q=db.from('meal_sessions').select('*,menu_templates(name,image_url)');
+  let q=db.from('meal_sessions').select('*,menu_templates(name,image_url),meal_session_groups(id,status,selected_session_id,meal_date)');
   q=scopeAdminClass(q);
   const{data,error}=await q.order('meal_date',{ascending:false}).order('created_at',{ascending:false});
   if(error)return toast(error.message);
@@ -535,15 +535,85 @@ $('resetClassGateBtn')?.addEventListener('click',async()=>{
 });
 
 function renderTemplateSelect(){
-  $('sessionTemplate').innerHTML=templates.filter(t=>t.active).map(t=>'<option value="'+t.id+'">'+esc(t.name)+'</option>').join('');
+  const activeOptions=templates.filter(t=>t.active).map(t=>'<option value="'+t.id+'">'+esc(t.name)+'</option>').join('');
+  $('sessionTemplate').innerHTML=activeOptions;
+  if($('sessionBackupTemplate'))$('sessionBackupTemplate').innerHTML=activeOptions;
   $('editSessionTemplate').innerHTML=templates.map(t=>'<option value="'+t.id+'">'+esc(t.name)+(t.active?'':'（停用）')+'</option>').join('');
+}
+function restaurantStatusLabel(status){
+  return ({pending:'尚未確認',awaiting:'等待餐廳確認',confirmed:'餐廳已接單',failed:'餐廳未接單',not_selected:'備用未採用'})[status]||status||'尚未確認';
+}
+function backupGroupStatusLabel(status){
+  return ({collecting:'等待選擇採用菜單',awaiting_restaurant:'等待餐廳確認',confirmed:'已完成',cancelled:'兩邊皆未接單'})[status]||status||'';
 }
 function renderTemplateList(){$('templateList').innerHTML=templates.map(t=>'<div class="admin-item">'+(t.image_url?'<img src="'+esc(t.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(t.name)+'</b><br><span class="hint">'+(t.active?'使用中':'已停用')+'</span></div><div class="actions"><button class="small-btn" onclick="openTemplateDialog('+t.id+')">編輯</button></div></div>').join('')||'<div class="loading">尚無菜單</div>'}
 function renderSessionList(){
   const current=sessions.filter(s=>s.meal_date>=today()).sort((a,b)=>a.meal_date.localeCompare(b.meal_date)||Number(a.id)-Number(b.id));
-  $('sessionCount').textContent=current.length+' 個';
-  $('sessionList').innerHTML=current.map(s=>'<div class="admin-item">'+(s.menu_templates?.image_url?'<img src="'+esc(s.menu_templates.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(s.menu_templates?.name||'菜單')+'</b><br>'+esc(s.meal_date)+(s.cutoff_at?' · 截止 '+esc(new Date(s.cutoff_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):'')+'<br><span class="hint">'+(s.is_active?'開放':'關閉')+'</span></div><div class="actions"><button class="small-btn" onclick="openSessionDialog('+s.id+')">編輯</button></div></div>').join('')||'<div class="loading">今天起沒有訂餐日期</div>';
+  const grouped=new Map();
+  for(const s of current){
+    const key=s.backup_group_id?'g:'+s.backup_group_id:'s:'+s.id;
+    if(!grouped.has(key))grouped.set(key,[]);
+    grouped.get(key).push(s);
+  }
+  $('sessionCount').textContent=grouped.size+' 個';
+  $('sessionList').innerHTML=[...grouped.values()].map(rows=>{
+    const s=rows[0];
+    if(s.backup_group_id){
+      const sorted=rows.slice().sort((a,b)=>String(a.backup_slot||'').localeCompare(String(b.backup_slot||'')));
+      const group=s.meal_session_groups||{};
+      const optionHtml=sorted.map(x=>{
+        const selected=Number(group.selected_session_id)===Number(x.id);
+        return '<div class="history-pack-order"><span><b>'+esc((x.backup_slot||'?')+'｜'+(x.menu_templates?.name||'菜單'))+'</b><small>'+esc(restaurantStatusLabel(x.restaurant_status))+(selected?' · 本次採用':'')+'</small></span><div class="actions">'+
+          (group.status==='collecting'&&x.restaurant_status!=='failed'?'<button class="small-btn" type="button" onclick="adminSelectBackup('+s.backup_group_id+','+x.id+')">採用 '+esc(x.backup_slot||'')+'</button>':'')+
+          '</div></div>';
+      }).join('');
+      const action=group.status==='awaiting_restaurant'
+        ?'<div class="btnrow"><button class="primary" type="button" onclick="adminConfirmBackup('+s.backup_group_id+')">餐廳接單成功</button><button class="small-btn danger" type="button" onclick="adminFailBackup('+s.backup_group_id+')">餐廳接單失敗</button></div>'
+        :'';
+      return '<div class="panel"><div class="section-head"><div><b>'+esc(s.meal_date+' 複選備用')+'</b><br><span class="hint">'+esc(backupGroupStatusLabel(group.status))+(s.cutoff_at?' · 截止 '+esc(new Date(s.cutoff_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):'')+'</span></div></div>'+optionHtml+action+'</div>';
+    }
+    const status=restaurantStatusLabel(s.restaurant_status);
+    const actions=s.restaurant_status==='pending'
+      ?'<button class="small-btn" onclick="openSessionDialog('+s.id+')">編輯</button> <button class="small-btn" onclick="adminSingleRestaurantResult('+s.id+',true)">接單成功</button> <button class="small-btn danger" onclick="adminSingleRestaurantResult('+s.id+',false)">接單失敗</button>'
+      :'<button class="small-btn" onclick="openSessionDialog('+s.id+')">編輯</button>';
+    return '<div class="admin-item">'+(s.menu_templates?.image_url?'<img src="'+esc(s.menu_templates.image_url)+'" alt="">':'<div></div>')+'<div><b>'+esc(s.menu_templates?.name||'菜單')+'</b><br>'+esc(s.meal_date)+(s.cutoff_at?' · 截止 '+esc(new Date(s.cutoff_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):'')+'<br><span class="hint">'+(s.is_active?'開放':'關閉')+' · '+esc(status)+'</span></div><div class="actions">'+actions+'</div></div>';
+  }).join('')||'<div class="loading">今天起沒有訂餐日期</div>';
 }
+async function adminSelectBackup(groupId,sessionId){
+  if(!confirm('確定採用這份菜單並開始跟餐廳確認？此時還不會扣學生錢包。'))return;
+  const{error}=await db.rpc('class_lunch_admin_select_backup_session',{p_group_id:Number(groupId),p_session_id:Number(sessionId)});
+  if(error)return toast('選擇失敗：'+error.message);
+  toast('已選擇菜單，等待餐廳確認');await loadSessions();
+}
+async function adminConfirmBackup(groupId){
+  if(!confirm('確認餐廳已接單？按下後才會正式成立訂單；選錢包的學生會在此刻扣款。'))return;
+  const{data,error}=await db.rpc('class_lunch_admin_confirm_backup_group',{p_group_id:Number(groupId)});
+  if(error)return toast('確認失敗：'+error.message);
+  toast('餐廳接單成功，正式成立 '+Number(data?.wallet_charged||0)+' 筆錢包訂單');
+  await Promise.all([loadSessions(),loadUnpaidOrders().catch(()=>{})]);
+  window.loadWalletDebts?.().catch?.(()=>{});
+}
+async function adminFailBackup(groupId){
+  if(!confirm('確認這家餐廳無法接單？這個選項會取消，不會產生債務；若另一份備用仍可用，可直接改採另一份。'))return;
+  const{data,error}=await db.rpc('class_lunch_admin_fail_backup_selection',{p_group_id:Number(groupId)});
+  if(error)return toast('標記失敗：'+error.message);
+  toast(Number(data?.remaining_options||0)>0?'已取消失敗菜單，可改選備用菜單':'A、B 都已失敗，本次訂餐取消');
+  await Promise.all([loadSessions(),loadUnpaidOrders().catch(()=>{})]);
+}
+async function adminSingleRestaurantResult(sessionId,success){
+  const msg=success
+    ?'確認餐廳已接單？'
+    :'確認餐廳無法接單？這會取消本次所有債務；已用錢包付款的訂單會自動退款。';
+  if(!confirm(msg))return;
+  const{data,error}=await db.rpc('class_lunch_admin_set_single_restaurant_result',{p_session_id:Number(sessionId),p_success:!!success});
+  if(error)return toast((success?'確認':'取消')+'失敗：'+error.message);
+  toast(success?'已標記餐廳接單成功':'餐廳未接單，本次債務已取消'+(Number(data?.cancelled_orders||0)?'（'+Number(data.cancelled_orders)+' 筆）':''));
+  await Promise.all([loadSessions(),loadUnpaidOrders().catch(()=>{})]);
+}
+window.adminSelectBackup=adminSelectBackup;
+window.adminConfirmBackup=adminConfirmBackup;
+window.adminFailBackup=adminFailBackup;
+window.adminSingleRestaurantResult=adminSingleRestaurantResult;
 function renderStudentList(){
   const visible=students.filter(s=>{
     if(s.role==='system_admin')return selectedAdminClassCode==='99'&&currentAdminRole==='system_admin';
@@ -1194,10 +1264,36 @@ $('editSessionDate').addEventListener('change',()=>{
   editingSessionOriginalDate=newDate;
 });
 
+$('sessionMode')?.addEventListener('change',()=>{
+  const backup=$('sessionMode').value==='backup';
+  $('sessionBackupTemplateLabel')?.classList.toggle('hidden',!backup);
+  if($('sessionBackupTemplate'))$('sessionBackupTemplate').required=backup;
+});
 $('sessionForm').addEventListener('submit',async e=>{
-  e.preventDefault();const cutoff=$('sessionCutoff').value;
-  const{error}=await db.from('meal_sessions').insert({menu_template_id:Number($('sessionTemplate').value),meal_date:$('sessionDate').value,cutoff_at:cutoff?new Date(cutoff+':00+08:00').toISOString():null,is_active:$('sessionActive').checked});
-  if(error)return toast(error.message);toast('訂餐日期已新增');applyDefaultSessionCutoff(true);await loadSessions();
+  e.preventDefault();
+  const cutoff=$('sessionCutoff').value;
+  const mode=$('sessionMode')?.value||'single';
+  let error=null;
+  if(mode==='backup'){
+    const a=Number($('sessionTemplate').value),b=Number($('sessionBackupTemplate').value);
+    if(!a||!b)return toast('請選擇 A、B 兩份菜單');
+    if(a===b)return toast('A、B 必須選不同菜單');
+    const r=await db.rpc('class_lunch_admin_create_backup_group',{
+      p_menu_a:a,p_menu_b:b,p_meal_date:$('sessionDate').value,
+      p_cutoff_at:cutoff?new Date(cutoff+':00+08:00').toISOString():null,
+      p_is_active:$('sessionActive').checked
+    });
+    error=r.error;
+  }else{
+    const r=await db.from('meal_sessions').insert({
+      menu_template_id:Number($('sessionTemplate').value),meal_date:$('sessionDate').value,
+      cutoff_at:cutoff?new Date(cutoff+':00+08:00').toISOString():null,is_active:$('sessionActive').checked
+    });
+    error=r.error;
+  }
+  if(error)return toast(error.message);
+  toast(mode==='backup'?'A／B 備用訂餐已新增':'訂餐日期已新增');
+  applyDefaultSessionCutoff(true);await loadSessions();
 });
 function localDatetime(v){if(!v)return'';const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(v));const m=Object.fromEntries(parts.map(x=>[x.type,x.value]));return m.year+'-'+m.month+'-'+m.day+'T'+m.hour+':'+m.minute}
 function openSessionDialog(id){const s=sessions.find(x=>x.id===id);if(!s)return;editingSessionId=id;editingSessionOriginalDate=s.meal_date;$('editSessionTemplate').value=String(s.menu_template_id);$('editSessionDate').value=s.meal_date;$('editSessionCutoff').value=localDatetime(s.cutoff_at)||defaultCutoffForDate(s.meal_date);$('editSessionActive').checked=s.is_active;$('sessionDialog').showModal()}
