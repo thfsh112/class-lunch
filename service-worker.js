@@ -1,21 +1,42 @@
-const STATIC_CACHE="class-lunch-static-v20261007-122";
+const STATIC_CACHE="class-lunch-static-v20261009-213";
 const IMAGE_CACHE="class-lunch-menu-images-v1";
 
 const APP_SHELL=[
   "./",
   "./index.html",
   "./admin.html",
-  "./style.css?v=20261007-122",
-  "./app.js?v=20261007-122",
-  "./wallet.js?v=20261007-122",
-  "./admin.js?v=20261007-122",
-  "./wallet-admin.js?v=20261007-122",
-  "./pwa.js?v=20261007-122",
-  "./manifest.webmanifest?v=20261007-122",
-  "./icon-192.png?v=20261007-122",
-  "./icon-512.png?v=20261007-122",
-  "./notification-icon.png?v=20261007-122",
-  "./notification-badge.png?v=20261007-122"
+  "./css/base.css?v=20261009-213",
+  "./css/wallet.css?v=20261009-213",
+  "./css/admin.css?v=20261009-213",
+  "./css/ordering.css?v=20261009-213",
+  "./css/order-dialog.css?v=20261009-213",
+  "./js/student/core.js?v=20261009-213",
+  "./js/student/history.js?v=20261009-213",
+  "./js/student/notifications.js?v=20261009-213",
+  "./js/student/account.js?v=20261009-213",
+  "./js/student/session-data.js?v=20261009-213",
+  "./js/student/backup.js?v=20261009-213",
+  "./js/student/order-options.js?v=20261009-213",
+  "./js/student/order-ui.js?v=20261009-213",
+  "./js/student/checkout.js?v=20261009-213",
+  "./js/student/realtime.js?v=20261009-213",
+  "./wallet.js?v=20261009-213",
+  "./js/admin/core.js?v=20261009-213",
+  "./js/admin/management.js?v=20261009-213",
+  "./js/admin/menus.js?v=20261009-213",
+  "./js/admin/ocr.js?v=20261009-213",
+  "./js/admin/orders.js?v=20261009-213",
+  "./js/admin/overview.js?v=20261009-213",
+  "./js/admin/payments.js?v=20261009-213",
+  "./js/admin/audit.js?v=20261009-213",
+  "./js/admin/realtime.js?v=20261009-213",
+  "./wallet-admin.js?v=20261009-213",
+  "./pwa.js?v=20261009-213",
+  "./manifest.webmanifest?v=20261009-213",
+  "./icon-192.png?v=20261009-213",
+  "./icon-512.png?v=20261009-213",
+  "./notification-icon.png?v=20261009-213",
+  "./notification-badge.png?v=20261009-213"
 ];
 
 self.addEventListener("install",event=>{
@@ -129,8 +150,8 @@ self.addEventListener("push",event=>{
   event.waitUntil(
     self.registration.showNotification(payload.title||"班級訂飯",{
       body:payload.body||"訂餐有新通知",
-      icon:"./notification-icon.png?v=20261007-122",
-      badge:"./notification-badge.png?v=20261007-122",
+      icon:"./notification-icon.png?v=20261009-213",
+      badge:"./notification-badge.png?v=20261009-213",
       tag:payload.tag||"class-lunch-notice",
       renotify:true,
       data:payload.data||{url:"https://thfsh112.github.io/class-lunch/"}

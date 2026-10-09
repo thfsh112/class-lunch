@@ -1,0 +1,70 @@
+/* Admin pending count badges */
+.badge-tab{
+  position:relative;
+}
+.count-badge{
+  position:absolute;
+  top:-7px;
+  right:-6px;
+  min-width:20px;
+  height:20px;
+  padding:0 5px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#d64545;
+  color:#fff;
+  border:2px solid #fff;
+  font-size:11px;
+  font-weight:800;
+  line-height:1;
+  box-sizing:border-box;
+  z-index:3;
+}
+.count-badge.hidden{
+  display:none!important;
+}
+@media(max-width:640px){
+  .admin-subtabs[data-admin-subgroup="money"] .tab{
+    font-size:11px;
+    padding-left:2px;
+    padding-right:2px;
+  }
+}
+
+.combo-order-row{border:1px solid #eadbd4;border-radius:15px;padding:11px;background:#fffaf6;align-items:start}
+.combo-order-main{display:grid;gap:9px;min-width:0}
+.combo-field{display:grid;gap:5px;margin:0;padding:9px 10px;border:1px solid #eee1dc;border-radius:12px;background:#fff}
+.combo-field>span{font-size:12px;font-weight:800;color:#6f554d}
+.combo-field>span small{font-weight:500;color:#927d74}
+.combo-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.combo-choice{display:flex;align-items:flex-start;gap:6px;padding:8px;border:1px solid #eee1dc;border-radius:10px;background:#fffaf6;font-size:13px}
+.combo-choice input{width:auto;margin:2px 0 0}
+.combo-line-price{display:flex;justify-content:flex-end;font-weight:800;color:#6f554d;font-size:13px}
+.combo-error{color:#a94735;font-weight:700}
+.combo-config-dialog{width:min(96vw,940px)}
+.combo-admin-section{margin-top:18px;padding-top:14px;border-top:1px solid #eadbd4}
+.combo-admin-section .item-editor-head>div{display:grid;gap:2px}
+.combo-admin-row{display:grid;grid-template-columns:minmax(140px,1.4fr) minmax(115px,.7fr) auto auto auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #f0e4de}
+.combo-admin-row>label:not(.mini-check),.combo-group-head>label:not(.mini-check),.combo-choice-admin-row>label:not(.mini-check){display:grid;gap:3px;font-size:11px;color:#927d74;margin:0}
+.combo-admin-row input,.combo-admin-row select,.combo-group-head input,.combo-group-head select,.combo-choice-admin-row input{margin:0}
+.combo-group-card{margin:12px 0;padding:12px;border:1px solid #eadbd4;border-radius:15px;background:#fffaf6}
+.combo-group-head{display:grid;grid-template-columns:minmax(150px,1.2fr) minmax(180px,1.2fr) 80px 80px auto auto;gap:8px;align-items:center}
+.combo-choice-admin-list{display:grid;gap:4px;margin:10px 0}
+.combo-choice-admin-row{display:grid;grid-template-columns:minmax(150px,1.4fr) minmax(110px,.7fr) auto auto auto;gap:8px;align-items:center;padding:7px 8px;border:1px solid #eee1dc;border-radius:11px;background:#fff}
+.combo-config-btn{white-space:nowrap}
+@media(max-width:720px){
+  .menu-item-row{grid-template-columns:1fr 1.35fr .7fr auto}
+  .menu-item-row .mini-check,.menu-item-row button{grid-column:auto}
+  .combo-choice-grid{grid-template-columns:1fr}
+  .combo-admin-row{grid-template-columns:1fr 1fr auto}
+  .combo-admin-row>input:first-child{grid-column:1/-1}
+  .combo-group-head{grid-template-columns:1fr 1fr}
+  .combo-group-head>input:first-child,.combo-group-head>select{grid-column:1/-1}
+  .combo-choice-admin-row{grid-template-columns:1fr 1fr auto}
+  .combo-choice-admin-row>input:first-child{grid-column:1/-1}
+}
+
+.combo-stats-section{margin-top:16px;padding-top:12px;border-top:1px solid #eee1dc}.combo-stats-section h3{margin:0 0 8px;font-size:14px;color:#6f554d}
+

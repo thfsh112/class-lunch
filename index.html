@@ -3,14 +3,18 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>班級訂飯 🍱</title>
-<link rel="icon" type="image/png" href="./icon-192.png?v=20261007-122">
-<link rel="apple-touch-icon" href="./icon-192.png?v=20261007-122">
+<link rel="icon" type="image/png" href="./icon-192.png?v=20261009-213">
+<link rel="apple-touch-icon" href="./icon-192.png?v=20261009-213">
 <meta name="theme-color" content="#f7e7c6">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="班級訂飯">
-<link rel="manifest" href="./manifest.webmanifest?v=20261007-122">
-<link rel="stylesheet" href="style.css?v=20261007-122">
+<link rel="manifest" href="./manifest.webmanifest?v=20261009-213">
+<link rel="stylesheet" href="css/base.css?v=20261009-213">
+<link rel="stylesheet" href="css/wallet.css?v=20261009-213">
+<link rel="stylesheet" href="css/admin.css?v=20261009-213">
+<link rel="stylesheet" href="css/ordering.css?v=20261009-213">
+<link rel="stylesheet" href="css/order-dialog.css?v=20261009-213">
 </head>
 <body>
 <header class="top hero">
@@ -166,11 +170,20 @@
 </dialog>
 
 <div id="imageModal" class="modal hidden" onclick="closeImage(event)"><div class="image-viewer" onclick="event.stopPropagation()"><button type="button" class="close" onclick="closeImage()">×</button><img id="largeImage" alt="菜單大圖"></div></div>
-<button class="app-version" type="button" data-app-version title="點一下重新載入最新版">2.12</button>
+<button class="app-version" type="button" data-app-version title="點一下重新載入最新版">2.13</button>
 <div id="toast" class="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>window.APP_CONFIG={supabaseUrl:"https://roynzxilxumfzzuezelg.supabase.co",publishableKey:"sb_publishable_nvmHzVjH7bZ8F9cnJYzKCg_PSPlhCXU"};</script>
-<script src="pwa.js?v=20261007-122"></script>
-<script src="app.js?v=20261007-122"></script>
-<script src="wallet.js?v=20261007-122"></script>
+<script src="pwa.js?v=20261009-213"></script>
+<script src="js/student/core.js?v=20261009-213"></script>
+<script src="js/student/history.js?v=20261009-213"></script>
+<script src="js/student/notifications.js?v=20261009-213"></script>
+<script src="js/student/account.js?v=20261009-213"></script>
+<script src="js/student/session-data.js?v=20261009-213"></script>
+<script src="js/student/backup.js?v=20261009-213"></script>
+<script src="js/student/order-options.js?v=20261009-213"></script>
+<script src="js/student/order-ui.js?v=20261009-213"></script>
+<script src="js/student/checkout.js?v=20261009-213"></script>
+<script src="js/student/realtime.js?v=20261009-213"></script>
+<script src="wallet.js?v=20261009-213"></script>
 </body></html>

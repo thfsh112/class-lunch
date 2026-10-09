@@ -1,0 +1,169 @@
+/* Student wallet tabs */
+.wallet-student-tabs{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:8px!important;
+  margin:12px 0 18px!important;
+}
+.wallet-student-tabs .tab{
+  width:100%;
+  min-width:0;
+  text-align:center;
+  white-space:nowrap;
+}
+.wallet-tab-page{
+  margin:0;
+}
+@media(max-width:640px){
+  .wallet-student-tabs{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  }
+  .wallet-student-tabs .tab{
+    padding:8px 6px;
+    font-size:12px;
+  }
+}
+
+
+/* Student wallet dialog: fixed viewport height with internal vertical scrolling */
+#walletDialog{
+  width:min(92vw,560px);
+  max-height:min(88vh,760px);
+  overflow:hidden;
+}
+#walletDialog .history-shell{
+  max-height:min(88vh,760px);
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding:20px;
+}
+#walletDialog .dialog-head{
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:#fff;
+  padding-bottom:10px;
+}
+@media(max-width:640px){
+  #walletDialog{
+    width:min(94vw,560px);
+    max-height:88vh;
+  }
+  #walletDialog .history-shell{
+    max-height:88vh;
+    padding:16px;
+  }
+}
+
+
+/* Student wallet: keep title + tab bar fixed, scroll page content only */
+#walletDialog{
+  overflow:hidden;
+}
+#walletDialog .history-shell{
+  display:flex;
+  flex-direction:column;
+  max-height:min(88vh,760px);
+  overflow:hidden;
+  padding:20px;
+}
+#walletDialog .dialog-head{
+  position:static;
+  flex:0 0 auto;
+  background:#fff;
+  padding-bottom:10px;
+}
+#walletDialog .wallet-student-tabs{
+  position:static;
+  flex:0 0 auto;
+  margin:0 0 14px!important;
+  background:#fff;
+  z-index:2;
+}
+#walletDialog .wallet-tab-page{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  padding-right:2px;
+}
+@media(max-width:640px){
+  #walletDialog .history-shell{
+    max-height:88vh;
+    padding:16px;
+  }
+}
+
+
+/* Consolidated unpaid orders */
+.unpaid-day-group{margin-top:16px;padding-top:14px;border-top:1px solid #eadbd4}
+.unpaid-day-group:first-child{margin-top:8px;border-top:0}
+.unpaid-day-group .unpaid-list{display:grid;grid-template-columns:1fr;gap:10px}
+.unpaid-day-group .history-row{grid-template-columns:1fr auto}
+.unpaid-day-group .actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:640px){
+  .admin-subtabs[data-admin-subgroup="orders"]{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+  .admin-subtabs[data-admin-subgroup="orders"] .tab{font-size:12px;padding-left:3px;padding-right:3px}
+  .unpaid-day-group .history-row{grid-template-columns:1fr}
+  .unpaid-day-group .actions{justify-content:space-between}
+}
+
+
+/* Student wallet unpaid summary + pay all */
+.wallet-payall-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin:14px 0 8px;
+}
+.wallet-payall-card{
+  min-height:98px;
+  padding:16px 18px;
+  border:1px solid #ead2c8;
+  border-radius:20px;
+  background:#fff;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:center;
+  gap:4px;
+  text-align:left;
+  color:inherit;
+}
+.wallet-payall-card small{
+  color:#9a8178;
+  font-size:13px;
+  font-weight:700;
+}
+.wallet-payall-card b{
+  font-size:24px;
+  line-height:1.1;
+}
+.wallet-payall-card span{
+  color:#9a8178;
+  font-size:12px;
+  font-weight:700;
+}
+.wallet-payall-action{
+  cursor:pointer;
+  font:inherit;
+}
+.wallet-payall-action:not(:disabled):hover{
+  transform:translateY(-1px);
+}
+.wallet-payall-action:not(:disabled) b{
+  color:#b96858;
+}
+.wallet-payall-action:disabled{
+  cursor:not-allowed;
+  opacity:.58;
+}
+@media(max-width:420px){
+  .wallet-payall-grid{gap:10px}
+  .wallet-payall-card{min-height:92px;padding:14px}
+  .wallet-payall-card b{font-size:21px}
+}
+
+

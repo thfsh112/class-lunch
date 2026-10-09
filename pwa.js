@@ -1,5 +1,5 @@
 (()=>{
-  const DISPLAY_VERSION="2.12";
+  const DISPLAY_VERSION="2.13";
   window.CLASS_LUNCH_APP_VERSION=DISPLAY_VERSION;
   function compareVersions(a,b){
     const aa=String(a||'').split('.').map(n=>Number(n)||0);
@@ -99,7 +99,7 @@
   async function registerPwa(){
     try{
       await cleanupOldRegistrations();
-      let reg=await navigator.serviceWorker.register("/class-lunch/service-worker.js?v=20261007-122",{scope:"/class-lunch/",updateViaCache:"none"});
+      let reg=await navigator.serviceWorker.register("/class-lunch/service-worker.js?v=20261009-213",{scope:"/class-lunch/",updateViaCache:"none"});
       await navigator.serviceWorker.ready;
       try{await reg.update()}catch{}
       window.CLASS_LUNCH_PWA_STATUS={supported:true,ready:true,error:null,registration:reg};
