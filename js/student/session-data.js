@@ -21,6 +21,7 @@ async function refresh(){
   }
   if(!s||!s.active){await db.auth.signOut();student=null;toast('此學生帳號目前無法使用');return refresh()}
   student=s;
+  window.classLunchSetMusicAccount?.(student);
   studentViewClassId=s.class_id||null;
   if(s.role==='system_admin'){
     const classCode=String(localStorage.getItem('class-lunch-last-class')||'99').trim()||'99';
