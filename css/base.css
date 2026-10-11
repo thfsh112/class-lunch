@@ -209,3 +209,9 @@
 }
 
 
+
+/* Accessible close button: prevent native mobile blue control artifacts */
+.form-dialog .dialog-head .close-dialog{appearance:none;-webkit-appearance:none;display:inline-flex;align-items:center;justify-content:center;flex:0 0 40px;width:40px;height:40px;min-width:40px;min-height:40px;padding:0;margin:0;border:1px solid #eadbd4;border-radius:12px;background:#fff8f2;color:#745b53;font-family:inherit;font-size:26px;font-weight:500;line-height:1;box-shadow:none;outline:none;-webkit-tap-highlight-color:transparent;cursor:pointer}
+.form-dialog .dialog-head .close-dialog:focus-visible{outline:2px solid #b97868;outline-offset:2px}
+.form-dialog .dialog-head .close-dialog:active{background:#f5e6df}
+.form-dialog .dialog-head .close-dialog::selection{background:transparent;color:inherit}
