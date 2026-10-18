@@ -1,7 +1,8 @@
 (()=>{'use strict';
 const STORAGE_KEY='class-lunch-music-enabled-v1';
 let enabled=true;try{enabled=localStorage.getItem(STORAGE_KEY)!=='false'}catch(_){}
-const DEFAULT_TRACK='./lunch-background-music.mp3';
+const DEFAULT_TRACK='./lunch-background-new.mp3';
+const FALLBACK_TRACK='./lunch-background-music.mp3';
 const SPECIAL_TRACK='./lunch-special-11216-9901.mp3';
 let accountKey='';
 const audio=new Audio(DEFAULT_TRACK);
@@ -26,9 +27,9 @@ document.addEventListener('pointerdown',play,{capture:true});
 document.addEventListener('keydown',play,{capture:true});
 if(button)button.addEventListener('click',()=>{enabled=!enabled;try{localStorage.setItem(STORAGE_KEY,String(enabled))}catch(_){}if(enabled)play();else audio.pause();render()});
 audio.addEventListener('error',()=>{
- if(audio.getAttribute('data-track')===SPECIAL_TRACK){
-  audio.src=DEFAULT_TRACK;audio.setAttribute('data-track',DEFAULT_TRACK);audio.load();
-  console.warn('Personal track unavailable; using default background music');
+ if(audio.getAttribute('data-track')===SPECIAL_TRACK||audio.getAttribute('data-track')===DEFAULT_TRACK){
+  audio.src=FALLBACK_TRACK;audio.setAttribute('data-track',FALLBACK_TRACK);audio.load();
+  console.warn('Requested background track unavailable; using previous default');
   return;
  }
  if(button){button.disabled=true;button.textContent='音樂無法載入';}
