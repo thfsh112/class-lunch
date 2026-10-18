@@ -19,7 +19,7 @@ window.classLunchSetMusicAccount=(student)=>{
  audio.pause();audio.src=target;audio.setAttribute('data-track',target);audio.load();
  if(enabled&&wasPlaying)audio.play().catch(()=>{});
 };
-audio.loop=true;audio.preload='none';audio.volume=.35;
+audio.loop=true;audio.preload='none';audio.volume=1;
 const button=document.getElementById('musicToggleButton');
 const render=()=>{if(!button)return;button.textContent=enabled?'音樂：開啟':'音樂：關閉';button.setAttribute('aria-label',enabled?'關閉背景音樂':'開啟背景音樂');button.setAttribute('aria-pressed',String(enabled));};
 const play=()=>{if(enabled&&audio.paused)audio.play().catch(()=>{});};
