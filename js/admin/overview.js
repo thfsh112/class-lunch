@@ -5,14 +5,17 @@ async function loadOverview(){
   if(error)return toast(error.message);
   const rawList=os||[];
   const list=rawList.filter(o=>o.order_status==='active'||(o.order_status==='pending_choice'&&o.backup_checkout_ready));
-  const paid=list.filter(o=>o.paid).length,total=list.reduce((a,o)=>a+Number(o.unit_price||0)*Number(o.quantity||1)+Number(o.service_fee||0),0);
+  const paid=list.filter(o=>o.paid).length;
+  const mealTotal=list.reduce((a,o)=>a+Number(o.unit_price||0)*Number(o.quantity||1),0);
+  const serviceFeeTotal=list.reduce((a,o)=>a+Number(o.service_fee||0),0);
+  const total=mealTotal+serviceFeeTotal;
   const isBackup=!!s?.backup_group_id;
   const paidLabel=$('statPaid')?.parentElement?.querySelector('small');
   const unpaidLabel=$('statUnpaidCount')?.parentElement?.querySelector('small');
   const totalLabel=$('statTotal')?.parentElement?.querySelector('small');
   if(paidLabel)paidLabel.textContent=isBackup?'已結算':'已付款';
   if(unpaidLabel)unpaidLabel.textContent=isBackup?'待確認':'未付款';
-  if(totalLabel)totalLabel.textContent=isBackup?'預估金額':'總金額';
+  if(totalLabel)totalLabel.textContent=isBackup?'預估應收':'同學應收總額';
   $('statOrders').textContent=list.length;$('statPaid').textContent=paid;$('statUnpaidCount').textContent=list.length-paid;
 
   const itemCounts=new Map(),variantCounts=new Map(),optionCounts=new Map(),normalizedOrders=new Set(),marketByOrder=new Map(),unresolvedOrders=new Set(),orderIds=list.map(o=>o.id);
@@ -60,6 +63,7 @@ async function loadOverview(){
     }
   }
   $('statTotal').textContent=money(total)+(unresolvedOrders.size?' ＋ 時價':'');
+  $('overviewServiceFeeBreakdown').textContent='餐點金額：'+money(mealTotal)+' ｜ 服務費合計：'+money(serviceFeeTotal)+' ｜ 向同學應收：'+money(total)+(unresolvedOrders.size?'（另含未定時價）':'');
   const itemRows=[...itemCounts.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'zh-Hant'));
   const variantRows=[...variantCounts.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'zh-Hant'));
   const optionSections=[...optionCounts.entries()]
@@ -108,7 +112,9 @@ async function loadOverview(){
     '總份數：'+totalQty+'份',
     '已訂：'+list.length+'人',
     '已付款：'+paid+'人｜未付款：'+(list.length-paid)+'人',
-    '總金額：'+money(total)+(unresolvedOrders.size?' ＋ 時價':'')
+    '餐點金額（付餐廳）：'+money(mealTotal)+(unresolvedOrders.size?' ＋ 時價':''),
+    '服務費合計：'+money(serviceFeeTotal),
+    '向同學應收總額：'+money(total)+(unresolvedOrders.size?' ＋ 時價':'')
   ].join('\n');
   const comboStatsHtml=
     (variantRows.length?'<div class="combo-stats-section"><h3>點餐方式</h3><div class="item-stats-table">'+variantRows.map(([name,qty])=>'<div class="item-stat-row"><span>'+esc(name)+'</span><b>'+qty+' 份</b></div>').join('')+'</div></div>':'')+
