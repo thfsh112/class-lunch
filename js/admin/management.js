@@ -82,11 +82,37 @@ function renderClassRosterManagement(){
   if($('classRosterHint'))$('classRosterHint').textContent=
     selectedAdminClassCode+'班目前 '+activeSeats.length+' 位學生；座號：'+(activeSeats.join('、')||'無')+'。移除座號只會停用帳號，歷史訂單、錢包與金流保留。';
 }
+async function loadServiceFeeSetting(){
+  const status=$('serviceFeeStatus'),control=$('serviceFeeEnabled');
+  control.disabled=true;
+  status.textContent='讀取服務費設定中…';
+  const {data,error}=await db.rpc('class_lunch_admin_service_fee');
+  if(error){
+    status.textContent='讀取失敗：'+error.message;
+    return;
+  }
+  control.checked=!!data?.enabled;
+  control.disabled=false;
+  status.textContent=data?.enabled?'目前已啟用：新訂單每筆加收 5 元':'目前未啟用：新訂單不收服務費';
+}
+$('serviceFeeForm')?.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const btn=$('saveServiceFeeBtn'),control=$('serviceFeeEnabled');
+  btn.disabled=true;control.disabled=true;
+  try{
+    const {data,error}=await db.rpc('class_lunch_admin_service_fee',{p_enabled:control.checked});
+    if(error)throw error;
+    $('serviceFeeStatus').textContent=data.enabled?'目前已啟用：新訂單每筆加收 5 元':'目前未啟用：新訂單不收服務費';
+    toast('本班服務費設定已儲存');
+  }catch(error){toast('儲存失敗：'+error.message)}
+  finally{btn.disabled=false;await loadServiceFeeSetting()}
+});
 async function loadClassManagement(){
   configureClassManagementPanels();
   if(!selectedAdminClassId)return;
   if(!students.length)await loadStudents();
   renderClassRosterManagement();
+  await loadServiceFeeSetting();
   if(currentAdminRole==='system_admin'&&selectedAdminClassCode==='99')await loadClasses();
 }
 async function addSelectedClassSeat(seat){

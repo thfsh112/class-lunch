@@ -1,5 +1,6 @@
 async function openOrderEditor(sessionId){
   if(!(await ensureLatestVersionBeforeOrdering()))return;
+  if(!(await refreshStudentServiceFee()))return toast('無法確認目前服務費設定，請稍後再試');
   const s=sessions.find(x=>x.id===sessionId),o=orders.find(x=>x.meal_session_id===sessionId);
   if(!s||expired(s)||o?.paid)return;
   editingSessionId=sessionId;$('orderDialogTitle').textContent=s.menu_templates?.name||'訂餐';$('orderDialogDate').textContent=fmtDate(s.meal_date);$('orderNote').value=o?.note||'';
@@ -26,12 +27,19 @@ async function openOrderEditor(sessionId){
   }else{
     $('orderItem').value=o?.item_name||'';$('orderAmount').value=o?.unit_price??'';
   }
+  updateOrderServiceFeeDisplay();
   $('orderDialog').showModal();
 }
 $('orderDialogForm').addEventListener('submit',async e=>{
   e.preventDefault();if(!editingSessionId)return;
   const note=$('orderNote').value.trim(),b=e.currentTarget.querySelector('button[type="submit"]');
   b.disabled=true;b.textContent='儲存中…';
+  const quotedFee=editingOrderServiceFee();
+  if(!(await refreshStudentServiceFee())){b.disabled=false;b.textContent='儲存訂單';return toast('無法確認服務費設定，暫時不能送出')}
+  if(quotedFee!==editingOrderServiceFee()){
+    renderTestOrderRows();updateOrderServiceFeeDisplay();
+    b.disabled=false;b.textContent='儲存訂單';return toast('服務費剛有變更，請先確認新的總金額再送出');
+  }
   let error=null;
   const hasStructuredItems=getTestItemsForSession().length>0;
   if(hasStructuredItems){
@@ -92,3 +100,5 @@ async function openHistory(){
 function openImage(u){$('largeImage').src=u;$('imageModal').classList.remove('hidden');document.body.style.overflow='hidden'}
 function closeImage(e){if(e&&e.target!==$('imageModal')&&!e.target.classList.contains('close'))return;$('imageModal').classList.add('hidden');$('largeImage').src='';document.body.style.overflow=''}
 document.addEventListener('click',e=>{const p=e.target.closest('.photo-button');if(p)openImage(p.dataset.imageUrl)});
+
+$('orderAmount')?.addEventListener('input',updateOrderServiceFeeDisplay);

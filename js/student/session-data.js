@@ -5,6 +5,7 @@ async function refresh(){
     stopStudentRealtime();
     student=null;
     studentViewClassId=null;
+    studentClassServiceFee=null;
     loadedMenuTemplateKey='';
     window.dispatchEvent(new Event('class-lunch-student-ready'));
     detachCurrentPushBinding();
@@ -34,6 +35,7 @@ async function refresh(){
     }
     studentViewClassId=activeClass.id;
   }
+  await refreshStudentServiceFee();
   window.dispatchEvent(new Event('class-lunch-student-ready'));
   watchNotificationPermission();$('loginBox').classList.add('hidden');$('heroAccount').classList.remove('hidden');$('logoutBtn').classList.remove('hidden');$('historyBtn').classList.remove('hidden');
   const isManager=['system_admin','class_admin'].includes(String(s.role||''));
@@ -58,12 +60,19 @@ async function refresh(){
   await loadSessions();
 }
 
+async function refreshStudentServiceFee(){
+  if(!studentViewClassId){studentClassServiceFee=null;return false}
+  const {data,error}=await db.from('classes').select('service_fee_enabled').eq('id',studentViewClassId).maybeSingle();
+  if(error||!data){studentClassServiceFee=null;return false}
+  studentClassServiceFee=data.service_fee_enabled?5:0;
+  return true;
+}
 async function loadOrderState(){
   orders=[];orderItemsByOrder={};
   if(!student||!sessions.length)return;
   const sessionIds=sessions.map(s=>s.id);
   const{data:os,error:oe}=await db.from('orders')
-    .select('id,meal_session_id,item_name,unit_price,note,paid,payment_method,onsite_received,created_at,menu_item_id,order_status,backup_checkout_ready')
+    .select('id,meal_session_id,item_name,unit_price,quantity,service_fee,note,paid,payment_method,onsite_received,created_at,menu_item_id,order_status,backup_checkout_ready')
     .eq('student_id',student.id)
     .in('meal_session_id',sessionIds)
     .order('created_at',{ascending:false});
@@ -175,10 +184,10 @@ function renderSessionPicker(){
 }
 function orderStateMarkup(o,label){
   if(!o)return '<div class="order-status empty"><b>'+esc(label)+' 尚未完成</b></div>';
-  if(o.order_status==='cancelled_restaurant')return '<div class="order-status empty"><b>'+esc(label)+' 餐廳未接單・已取消</b><div>'+esc(o.item_name||'')+' · '+money(o.unit_price)+'</div></div>';
-  if(o.order_status==='cancelled_backup')return '<div class="order-status empty"><b>'+esc(label)+' 備用未採用</b><div>'+esc(o.item_name||'')+' · '+money(o.unit_price)+'</div></div>';
+  if(o.order_status==='cancelled_restaurant')return '<div class="order-status empty"><b>'+esc(label)+' 餐廳未接單・已取消</b><div>'+esc(o.item_name||'')+' · '+money(grossOrderAmount(o))+'</div></div>';
+  if(o.order_status==='cancelled_backup')return '<div class="order-status empty"><b>'+esc(label)+' 備用未採用</b><div>'+esc(o.item_name||'')+' · '+money(grossOrderAmount(o))+'</div></div>';
   const pending=o.order_status==='pending_choice';
-  return '<div class="order-status '+(o.paid?'paid':'pending')+'"><b>'+esc(label)+' '+(o.paid?'✓ 已付款':pending?'✓ 已完成選餐':'已訂餐 · 未付款')+'</b><div>'+esc(o.item_name||'')+' · '+money(o.unit_price)+'</div></div>';
+  return '<div class="order-status '+(o.paid?'paid':'pending')+'"><b>'+esc(label)+' '+(o.paid?'✓ 已付款':pending?'✓ 已完成選餐':'已訂餐 · 未付款')+'</b><div>'+esc(o.item_name||'')+' · '+money(grossOrderAmount(o))+'</div></div>';
 }
 function renderSessions(){
   if(!sessions.length){$('menus').innerHTML='<div class="loading lunch-empty-egg"><b>今天暫時沒有便當可以支配你的人生。</b><span>有開放訂餐時會出現在這裡。</span></div>';return}
@@ -214,9 +223,9 @@ function renderSessions(){
     const unresolvedMarket=rows.some(x=>x.is_market_price&&x.market_price_amount==null)||(!knownMarket&&String(o.item_name||'').includes('（時價）'));
     const hasOnsiteMoney=Number(o.onsite_received||0)!==0;
     if(o.order_status==='cancelled_restaurant'){
-      state='<div class="order-status empty"><b>餐廳未接單・本次已取消</b><div>'+esc(o.item_name||'')+' · '+money(o.unit_price)+'</div><small>這筆不會列入欠款；原錢包扣款如有發生會留下退款紀錄。</small></div>';
+      state='<div class="order-status empty"><b>餐廳未接單・本次已取消</b><div>'+esc(o.item_name||'')+' · '+money(grossOrderAmount(o))+'</div><small>這筆不會列入欠款；原錢包扣款如有發生會留下退款紀錄。</small></div>';
     }else{
-      state='<div class="order-status '+(o.paid?'paid':'pending')+'"><b>'+(o.paid?'✓ 已付款':'已訂餐 · 未付款')+'</b><div>'+esc(o.item_name)+' · '+money(o.unit_price)+(unresolvedMarket?' ＋ 時價':'')+'</div><small>'+esc(o.note||'無備註')+'</small>'+(hasOnsiteMoney&&!o.paid?'<small>此訂單已有現場收款紀錄，請由管理員處理後續。</small>':'')+'<small class="easter-note">'+esc(paymentEaster(!!o.paid,o.unit_price))+'</small></div>';
+      state='<div class="order-status '+(o.paid?'paid':'pending')+'"><b>'+(o.paid?'✓ 已付款':'已訂餐 · 未付款')+'</b><div>'+esc(o.item_name)+' · '+money(grossOrderAmount(o))+(unresolvedMarket?' ＋ 時價':'')+'</div><small>'+esc(o.note||'無備註')+'</small>'+(hasOnsiteMoney&&!o.paid?'<small>此訂單已有現場收款紀錄，請由管理員處理後續。</small>':'')+'<small class="easter-note">'+esc(paymentEaster(!!o.paid,o.unit_price))+'</small></div>';
       if(!closed&&!o.paid&&!hasOnsiteMoney)state+='<div class="order-actions"><button class="primary" onclick="openOrderEditor('+s.id+')">修改訂單</button><button class="small-btn danger" onclick="cancelOrder('+s.id+')">取消訂單</button></div>';
       else if(!closed&&o.paid&&o.payment_method==='wallet')state+='<div class="order-actions"><button class="small-btn danger" onclick="cancelOrder('+s.id+')">取消訂單並退回錢包</button></div>';
     }

@@ -154,7 +154,8 @@ function renderTestOrderRows(){
   }).join('');
 
   const quote=currentConfiguredQuote();
-  $('selectedItemPrice').textContent=money(quote.amount)+(quote.unresolvedMarket?' ＋ 時價':'');
+  $('selectedItemPrice').textContent=money(quote.amount+editingOrderServiceFee())+(quote.unresolvedMarket?' ＋ 時價':'');
+  updateOrderServiceFeeDisplay();
 }
 function updateTestOrderItem(i,value){
   testSelections[i]=newConfiguredSelection(value);

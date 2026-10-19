@@ -70,7 +70,7 @@ async function syncHistoryDelta(){
 function renderHistoryList(list){
   const rows=list||[];
   const financialRows=rows.filter(o=>!['cancelled_backup','cancelled_restaurant','pending_choice'].includes(o.order_status));
-  const total=financialRows.reduce((sum,o)=>sum+Number(o.unit_price||0),0);
+  const total=financialRows.reduce((sum,o)=>sum+Number(o.order_total??(Number(o.unit_price||0)+Number(o.service_fee||0))),0);
   const paid=financialRows.filter(o=>o.paid).length;
   const unpaid=financialRows.filter(o=>!o.paid).length;
   const hasMarket=financialRows.some(o=>o.unresolved_market);
@@ -87,9 +87,9 @@ function renderHistoryList(list){
       '<div class="history-date">'+esc(date?fmtDate(date):'—')+'</div>'+
       '<div class="history-main"><div class="history-title"><b>'+esc(shop)+'</b><span class="'+(o.paid?'history-paid':'history-unpaid')+'">'+(o.order_status==='cancelled_restaurant'?'餐廳未接單・已取消':o.order_status==='cancelled_backup'?'備用未採用':o.order_status==='pending_choice'?'等待採用':o.paid?'已付款':'未付款')+'</span>'+(streak?'<span class="loyalty-badge">忠誠顧客 ×'+streak+'</span>':'')+'</div>'+
       '<div class="history-items">'+esc(o.item_name||'未記錄品項')+'</div>'+
-      (o.note?'<small>備註：'+esc(o.note)+'</small>':'')+
+      (o.note?'<small>備註：'+esc(o.note)+'</small>':'')+(Number(o.service_fee||0)>0?'<small>含服務費 '+money(o.service_fee)+'</small>':'')+
       (!['cancelled_backup','cancelled_restaurant','pending_choice'].includes(o.order_status)?'<small class="easter-note">'+esc(paymentEaster(!!o.paid,o.unit_price))+'</small>':'')+'</div>'+
-      '<strong class="history-price">'+money(o.unit_price)+(o.unresolved_market?' ＋ 時價':'')+'</strong>'+
+      '<strong class="history-price">'+money(o.order_total??(Number(o.unit_price||0)+Number(o.service_fee||0)))+(o.unresolved_market?' ＋ 時價':'')+'</strong>'+
     '</article>';
   }).join(''):'<div class="history-empty"><b>還沒有歷史訂單</b><span>完成第一次訂餐後會出現在這裡。</span></div>';
 }

@@ -8,7 +8,9 @@ async function openMarketPriceDialog(orderId,seat){
   if(error)return toast('讀取時價品項失敗：'+error.message);
   const rows=data||[];
   marketOrderItems=rows.filter(x=>x.is_market_price);
-  marketFixedTotal=rows.reduce((s,x)=>s+Number(x.unit_price||0)*Number(x.quantity||1),0);
+  const {data:orderFee,error:feeError}=await db.from('orders').select('service_fee').eq('id',orderId).single();
+  if(feeError)return toast('讀取服務費失敗：'+feeError.message);
+  marketFixedTotal=rows.reduce((s,x)=>s+Number(x.unit_price||0)*Number(x.quantity||1),0)+Number(orderFee?.service_fee||0);
   if(!marketOrderItems.length)return toast('這張訂單沒有時價品項');
   $('marketPriceRows').innerHTML=marketOrderItems.map(x=>
     '<label class="market-price-row"><span><b>'+esc(x.item_name_snapshot||x.menu_items?.name||'時價品項')+'</b><small>數量 '+Number(x.quantity||1)+' · 固定加價 '+money(x.unit_price||0)+'</small></span>'+

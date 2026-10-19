@@ -69,7 +69,7 @@ async function loadHistoryOrders(){
   const packs=await Promise.all(past.map(async s=>{
     const legacy=s.legacy_menu_id||-1;
     const{data,error}=await db.from('orders')
-      .select('id,student_id,student_name,item_name,unit_price,note,paid,quantity,order_status,backup_checkout_ready,payment_method')
+      .select('id,student_id,student_name,item_name,unit_price,service_fee,note,paid,quantity,order_status,backup_checkout_ready,payment_method')
       .or('meal_session_id.eq.'+s.id+',menu_id.eq.'+legacy);
     return {session:s,orders:data||[],error};
   }));
@@ -79,7 +79,7 @@ async function loadHistoryOrders(){
     const rows=pack.orders;
     const financialRows=rows.filter(o=>o.order_status==='active');
     const paid=financialRows.filter(o=>o.paid).length;
-    const total=financialRows.reduce((sum,o)=>sum+Number(o.unit_price||0)*Number(o.quantity||1),0);
+    const total=financialRows.reduce((sum,o)=>sum+Number(o.unit_price||0)*Number(o.quantity||1)+Number(o.service_fee||0),0);
     const body=rows.length?rows.slice().sort((a,b)=>{
       const aSeat=students.find(x=>x.id===a.student_id)?.seat_number;
       const bSeat=students.find(x=>x.id===b.student_id)?.seat_number;
@@ -90,7 +90,7 @@ async function loadHistoryOrders(){
       const st=students.find(x=>x.id===o.student_id);
       const seat=st?.seat_number??(Number.isFinite(Number(o.student_name))?Number(o.student_name):'？');
       const unresolved=String(o.item_name||'').includes('（時價）');
-      const amount=Number(o.unit_price||0)*Number(o.quantity||1);
+      const amount=Number(o.unit_price||0)*Number(o.quantity||1)+Number(o.service_fee||0);
       const status=o.order_status==='cancelled_restaurant'?'餐廳未接單・已取消':o.order_status==='cancelled_backup'?'備用未採用':o.order_status==='pending_choice'?'未完成／待確認':o.paid?'已付款':'未付款';
       return '<div class="history-pack-order"><span><b>'+esc(seat+'號'+(st?.name?' '+st.name:''))+'</b><small>'+esc(o.item_name||'未記錄品項')+(o.note?' · 備註：'+esc(o.note):'')+'</small></span><strong>'+money(amount)+(unresolved?' ＋ 時價':'')+' · '+esc(status)+'</strong></div>';
     }).join(''):'<div class="loading">這個日期沒有訂單</div>';

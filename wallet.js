@@ -147,12 +147,13 @@
   function currentCheckoutQuote(){
     const structured=getTestItemsForSession().length>0;
     if(structured&&typeof currentConfiguredQuote==='function'){
-      return currentConfiguredQuote();
+      const quote=currentConfiguredQuote();
+      return {...quote,amount:Number(quote.amount||0)+editingOrderServiceFee()};
     }
     const raw=String(byId('orderAmount')?.value??'').trim();
     const amount=Number(raw);
     return {
-      amount:raw!==''&&Number.isFinite(amount)?amount:0,
+      amount:(raw!==''&&Number.isFinite(amount)?amount:0)+editingOrderServiceFee(),
       unresolvedMarket:false,
       error:''
     };
@@ -460,6 +461,12 @@
       if(Number(quote.amount)<1)return toast('錢包結帳金額至少要 1 元');
     }
     b.disabled=true;b.textContent='儲存中…';
+    const quotedFee=editingOrderServiceFee();
+    if(!(await refreshStudentServiceFee())){b.disabled=false;b.textContent='儲存訂單';return toast('無法確認服務費設定，暫時不能送出')}
+    if(quotedFee!==editingOrderServiceFee()){
+      if(typeof renderTestOrderRows==='function')renderTestOrderRows();updateOrderServiceFeeDisplay();
+      b.disabled=false;b.textContent='儲存訂單';return toast('服務費剛有變更，請先確認新的總金額再送出');
+    }
     try{
       const structured=getTestItemsForSession().length>0;
       let result;
