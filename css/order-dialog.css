@@ -66,3 +66,21 @@
   pointer-events:auto;
   touch-action:manipulation;
 }
+
+/* v2.21: A mobile picker is a modal sheet: lift its scroll layer above the
+   fixed checkout footer, so the last options are visible and tappable. */
+@media(max-width:720px){
+  #orderDialogForm>.order-dialog-scroll:has(.pretty-select.open){
+    position:relative;
+    z-index:10004;
+  }
+  #orderDialog .pretty-select.open .pretty-select-menu{
+    bottom:max(12px,env(safe-area-inset-bottom));
+    max-height:min(70dvh,660px);
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y;
+    padding-bottom:max(24px,env(safe-area-inset-bottom));
+  }
+}
