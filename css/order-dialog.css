@@ -11,11 +11,12 @@
   overflow:hidden;
 }
 #orderDialogForm>.dialog-head{
+  position:relative;
   flex:0 0 auto;
   padding:20px 20px 12px;
   background:#fff;
   border-bottom:1px solid #f0e4de;
-  z-index:4;
+  z-index:10003;
 }
 .order-dialog-scroll{
   flex:1 1 auto;
@@ -30,7 +31,7 @@
 #orderDialogForm>.dialog-actions{
   flex:0 0 auto;
   position:relative;
-  z-index:5;
+  z-index:10003;
   margin:0;
   padding:12px 20px max(12px,env(safe-area-inset-bottom));
   border-top:1px solid #eadbd4;
@@ -56,4 +57,12 @@
   #orderDialogForm>.dialog-actions{
     padding:11px 14px max(11px,env(safe-area-inset-bottom));
   }
+}
+
+/* Keep cancellation controls above the mobile option-sheet touch layer. */
+#orderDialogForm>.dialog-head .close-dialog,
+#orderDialogForm>.dialog-actions .ghost{
+  position:relative;
+  pointer-events:auto;
+  touch-action:manipulation;
 }

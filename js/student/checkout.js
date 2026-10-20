@@ -30,6 +30,23 @@ async function openOrderEditor(sessionId){
   updateOrderServiceFeeDisplay();
   $('orderDialog').showModal();
 }
+// Only a deliberate cancellation clears the A/B flow. Successful saves still advance it.
+function closeOrderEditor(){
+  const dialog=$('orderDialog');
+  if(!dialog?.open)return;
+  closePrettySelects();
+  dialog.close();
+  editingSessionId=null;
+  testSelections=[];
+  backupOrderFlow=null;
+}
+$('orderDialog')?.addEventListener('cancel',()=>{
+  closePrettySelects();
+  editingSessionId=null;
+  testSelections=[];
+  backupOrderFlow=null;
+});
+
 $('orderDialogForm').addEventListener('submit',async e=>{
   e.preventDefault();if(!editingSessionId)return;
   const note=$('orderNote').value.trim(),b=e.currentTarget.querySelector('button[type="submit"]');
